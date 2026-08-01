@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Interno — Rafael Agustín Crespo</title>
+<style>
+  :root {
+    --bg-plane:        #05070c;
+    --bg-surface:      #0a0e16;
+    --bg-surface-2:    #0d1220;
+    --line:            rgba(255,255,255,0.08);
+    --line-strong:     rgba(255,255,255,0.14);
+
+    --ink-primary:     #eef3f8;
+    --ink-secondary:   #93a4b8;
+    --ink-muted:       #5b6b80;
+
+    /* UI / glow tints — bright, for chrome, text, borders */
+    --cyan:            #22d3ee;
+    --cyan-dim:        #0891b2;
+    --magenta:         #e879f9;
+    --magenta-dim:     #a21caf;
+    --green:           #4ade80;
+    --green-dim:       #15803d;
+    --amber:           #fbbf24;
+    --amber-dim:       #b45309;
+
+    /* validated data-mark fills (categorical, dark-mode, CVD-checked) */
+    --data-1: #0891b2; /* cyan   */
+    --data-2: #a21caf; /* magenta*/
+    --data-3: #15803d; /* green  */
+    --data-4: #b45309; /* amber  */
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg-plane);
+    color: var(--ink-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    background-image:
+      linear-gradient(rgba(34,211,238,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,211,238,0.035) 1px, transparent 1px);
+    background-size: 42px 42px;
+    background-attachment: fixed;
+  }
+
+  .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace; }
+
+  a { color: var(--cyan); }
+
+  /* ---------- layout shells ---------- */
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  header.hero {
+    position: relative;
+    padding: 56px 24px 40px;
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+  header.hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(34,211,238,0.10), transparent 55%),
+      radial-gradient(ellipse at 85% 30%, rgba(232,121,249,0.08), transparent 55%);
+    pointer-events: none;
+  }
+  .hero-inner { max-width: 1180px; margin: 0 auto; position: relative; }
+  .status-row {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-bottom: 18px;
+  }
+  .badge {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-secondary);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    background: rgba(255,255,255,0.02);
+  }
+  .badge.live { color: var(--green); border-color: rgba(74,222,128,0.35); }
+  .badge.live::before { content: "● "; }
+  .badge.warn { color: var(--amber); border-color: rgba(251,191,36,0.35); }
+
+  h1.title {
+    font-size: clamp(28px, 4vw, 44px);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .title .accent { color: var(--cyan); text-shadow: 0 0 18px rgba(34,211,238,0.45); }
+  p.subtitle {
+    color: var(--ink-secondary);
+    font-size: 15px;
+    max-width: 640px;
+    margin: 0;
+  }
+
+  /* ---------- section chrome ---------- */
+  section { padding: 56px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .sec-num {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    border: 1px solid rgba(34,211,238,0.35);
+    padding: 3px 8px;
+    clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 0 5px);
+    box-shadow: 0 0 12px rgba(34,211,238,0.15);
+  }
+  .sec-head h2 {
+    font-size: 20px;
+    margin: 0;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .sec-note { color: var(--ink-muted); font-size: 13px; margin-top: -18px; margin-bottom: 24px; }
+
+  /* fade-in on scroll */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ---------- panel / card ---------- */
+  .grid { display: grid; gap: 18px; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .panel {
+    background: linear-gradient(180deg, var(--bg-surface), var(--bg-surface-2));
+    border: 1px solid var(--line-strong);
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    padding: 22px;
+    position: relative;
+  }
+  .panel::after {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, var(--cyan), transparent 60%);
+    opacity: 0.5;
+  }
+  .panel h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cyan);
+  }
+  .panel p, .panel li { color: var(--ink-secondary); font-size: 14.5px; }
+  .panel ul { margin: 0; padding-left: 18px; }
+  .panel li { margin-bottom: 6px; }
+  .panel.no-glow::after { display: none; }
+  .panel.magenta h3 { color: var(--magenta); }
+  .panel.magenta::after { background: linear-gradient(90deg, var(--magenta), transparent 60%); }
+  .panel.amber h3 { color: var(--amber); }
+  .panel.amber::after { background: linear-gradient(90deg, var(--amber), transparent 60%); }
+  .panel.green h3 { color: var(--green); }
+  .panel.green::after { background: linear-gradient(90deg, var(--green), transparent 60%); }
+
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    border: 1px solid var(--line-strong);
+    padding: 2px 7px;
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+
+  /* ---------- stat tiles ---------- */
+  .stat-tile {
+    text-align: left;
+  }
+  .stat-tile .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+  }
+  .stat-tile .value {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 600;
+    color: var(--ink-primary);
+    text-shadow: 0 0 16px rgba(34,211,238,0.25);
+  }
+  .stat-tile .value.cyan { color: var(--cyan); }
+  .stat-tile .value.magenta { color: var(--magenta); }
+  .stat-tile .value.green { color: var(--green); text-shadow: 0 0 16px rgba(74,222,128,0.25); }
+  .stat-tile .sub { font-size: 12.5px; color: var(--ink-muted); margin-top: 6px; }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 rgba(34,211,238,0); }
+    50% { box-shadow: 0 0 22px rgba(34,211,238,0.18); }
+  }
+  .pulse { animation: pulseGlow 3.2s ease-in-out infinite; }
+
+  /* ---------- pricing ---------- */
+  .price-card {
+    text-align: center;
+    position: relative;
+  }
+  .price-card .plan { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+  .price-card .amount {
+    font-family: ui-monospace, monospace;
+    font-size: 32px;
+    margin: 10px 0;
+    color: var(--cyan);
+  }
+  .price-card .desc { font-size: 13px; color: var(--ink-secondary); }
+
+  /* ---------- charts ---------- */
+  .chart-card canvas { max-height: 260px; }
+  .legend-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+  .legend-list li { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-secondary); }
+  .dot { width: 9px; height: 9px; display: inline-block; flex: none; }
+
+  /* ---------- portfolio counters ---------- */
+  .counter-grid { text-align: center; }
+  .counter { font-family: ui-monospace, monospace; font-size: clamp(30px, 4.5vw, 48px); color: var(--cyan); text-shadow: 0 0 20px rgba(34,211,238,0.3); }
+  .counter-label { color: var(--ink-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 8px; }
+  .client-tags { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 28px; }
+  .client-tags span {
+    font-size: 13px; color: var(--ink-primary);
+    border: 1px solid var(--line-strong);
+    padding: 6px 14px;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+
+  /* ---------- open questions ---------- */
+  .q-list { display: flex; flex-direction: column; gap: 12px; }
+  .q-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    border: 1px solid var(--line-strong);
+    padding: 14px 16px;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    background: rgba(255,255,255,0.015);
+  }
+  .q-item .q-mark {
+    font-family: ui-monospace, monospace;
+    color: var(--amber);
+    border: 1px solid rgba(251,191,36,0.35);
+    padding: 2px 7px;
+    font-size: 11px;
+    flex: none;
+  }
+  .q-item p { margin: 0; color: var(--ink-secondary); font-size: 14.5px; }
+
+  footer {
+    padding: 32px 0 0;
+    color: var(--ink-muted);
+    font-size: 12.5px;
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 620px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .wrap { padding: 0 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="status-row">
+      <span class="badge live">Sistema activo</span>
+      <span class="badge warn">Snapshot puntual — julio 2026</span>
+      <span class="badge">Uso interno · no es material de venta</span>
+    </div>
+    <h1 class="title">Panel Interno — <span class="accent">Rafael Agustín Crespo</span></h1>
+    <p class="subtitle">Resumen de referencia rápida del negocio: modelo de servicio, equipo, precios y snapshot financiero. Documento informativo para uso personal, no un dashboard en vivo.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 01 — MODELO DE NEGOCIO -->
+  <section id="modelo">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.01</span>
+      <h2>Resumen del modelo de negocio</h2>
+    </div>
+    <div class="grid grid-3">
+      <div class="panel reveal">
+        <h3>Quién soy</h3>
+        <p>Rafael Agustín Crespo. Ofrezco edición de video + orientación de grabación para coaches e infoproductores de habla hispana que facturan +2K USD/mes.</p>
+      </div>
+      <div class="panel magenta reveal">
+        <h3>A quién le vendo</h3>
+        <p>Coaches e infoproductores hispanohablantes con facturación mensual superior a 2.000 USD, que necesitan contenido editado con criterio y un proceso de grabación ordenado.</p>
+      </div>
+      <div class="panel amber reveal">
+        <h3>Qué NO hago</h3>
+        <ul>
+          <li>Copywriting</li>
+          <li>Calendario de contenido</li>
+          <li>Publicación por el cliente</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 — ESTRUCTURA DE SERVICIO -->
+  <section id="servicio">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.02</span>
+      <h2>Estructura de servicio</h2>
+    </div>
+    <div class="grid grid-2">
+      <div class="panel reveal">
+        <h3>Qué incluye</h3>
+        <ul>
+          <li>Orientación de grabación</li>
+          <li>Edición con criterio</li>
+          <li>Entrega organizada (Drive + tracker)</li>
+          <li>Seguimiento semanal</li>
+          <li>Acceso a Skool</li>
+          <li>Llamadas 1 a 1</li>
+        </ul>
+      </div>
+      <div class="panel reveal">
+        <h3>Capacidad y entrada de clientes</h3>
+        <p><strong class="mono" style="color:var(--cyan)">Máximo 10 clientes nuevos por mes.</strong></p>
+        <p>Canales de entrada: landing propia + Calendly, y referidos de clientes actuales.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 — ESTRUCTURA DE EQUIPO -->
+  <section id="equipo">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.03</span>
+      <h2>Estructura de equipo</h2>
+    </div>
+    <div class="grid grid-2">
+      <div class="panel reveal">
+        <h3>Editores</h3>
+        <p>~10 editores en el equipo. Pago por video editado, con tarifa variable según tipo de contenido:</p>
+        <span class="pill">Reels ~$8–21</span>
+        <span class="pill">Ads ~$10–17</span>
+        <span class="pill">VSL ~$95–250</span>
+        <span class="pill">Testimonios ~$4–9</span>
+      </div>
+      <div class="panel magenta reveal">
+        <h3>Ventas</h3>
+        <p>Yo cierro el 100% de las llamadas de diagnóstico. No se delega esta parte del proceso.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — PRECIOS -->
+  <section id="precios">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.04</span>
+      <h2>Estructura de precios actual</h2>
+    </div>
+    <p class="sec-note reveal">⚠ En revisión — sujeto a cambios, ver sección 07.</p>
+    <div class="grid grid-3">
+      <div class="panel price-card reveal">
+        <div class="plan">Mensual</div>
+        <div class="amount mono">~$800<span style="font-size:14px;color:var(--ink-muted)">/mes</span></div>
+        <div class="desc">Sin compromiso de permanencia</div>
+      </div>
+      <div class="panel price-card reveal pulse">
+        <div class="plan">Trimestral</div>
+        <div class="amount mono">~$2.100</div>
+        <div class="desc">Descuento por compromiso de 3 meses</div>
+      </div>
+      <div class="panel price-card reveal">
+        <div class="plan">Semestral</div>
+        <div class="amount mono">~$3.900</div>
+        <div class="desc">Descuento por compromiso de 6 meses</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 — SNAPSHOT FINANCIERO -->
+  <section id="financiero">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.05</span>
+      <h2>Snapshot financiero</h2>
+    </div>
+    <p class="sec-note reveal">Datos reales de julio 2026, usados como ejemplo del modelo. Es una foto de un mes puntual, no una cifra en vivo ni un promedio.</p>
+
+    <div class="grid grid-4 reveal" style="margin-bottom:18px;">
+      <div class="panel stat-tile">
+        <div class="label">Ingreso facturado</div>
+        <div class="value cyan mono" data-counter data-target="6604" data-prefix="$">$0</div>
+      </div>
+      <div class="panel stat-tile green">
+        <div class="label">Ganancia neta</div>
+        <div class="value green mono" data-counter data-target="3080" data-prefix="$">$0</div>
+        <div class="sub">~47% de margen</div>
+      </div>
+      <div class="panel stat-tile">
+        <div class="label">Costo editores</div>
+        <div class="value mono" data-counter data-target="2350" data-prefix="$">$0</div>
+      </div>
+      <div class="panel stat-tile">
+        <div class="label">Gastos fijos software</div>
+        <div class="value mono" data-counter data-target="119" data-prefix="$">$0</div>
+        <div class="sub">Adobe, Frame, Highfield, Drive, Skool, Claude</div>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="panel chart-card reveal">
+        <h3>Reparto de la ganancia neta</h3>
+        <canvas id="chartReparto"></canvas>
+        <ul class="legend-list">
+          <li><span class="dot" style="background:var(--data-1)"></span>Rafael (70%) — $2.173</li>
+          <li><span class="dot" style="background:var(--data-2)"></span>Fondo de reserva (30%) — $931</li>
+        </ul>
+      </div>
+      <div class="panel chart-card reveal">
+        <h3>Desglose de costos sobre el ingreso</h3>
+        <canvas id="chartCostos"></canvas>
+        <ul class="legend-list">
+          <li><span class="dot" style="background:var(--data-1)"></span>Edición — $2.350</li>
+          <li><span class="dot" style="background:var(--data-2)"></span>Comisión referidos / otros* — $1.055</li>
+          <li><span class="dot" style="background:var(--data-3)"></span>Ganancia neta — $3.080</li>
+          <li><span class="dot" style="background:var(--data-4)"></span>Software — $119</li>
+        </ul>
+        <p style="font-size:11.5px;color:var(--ink-muted);margin-top:10px;">*Calculado por diferencia (ingreso − edición − software − ganancia neta). El desglose exacto de esta partida está [PENDIENTE DE DEFINIR].</p>
+      </div>
+      <div class="panel chart-card reveal">
+        <h3>Margen % por cliente (julio, precio de lista)</h3>
+        <canvas id="chartMargenes"></canvas>
+      </div>
+      <div class="panel chart-card reveal">
+        <h3>Pago a editores (julio)</h3>
+        <canvas id="chartEditores"></canvas>
+        <p style="font-size:11.5px;color:var(--ink-muted);margin-top:10px;">Resto del equipo (~6 editores) sin facturación registrada ese mes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 — PORTAFOLIO -->
+  <section id="portafolio">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.06</span>
+      <h2>Métricas de portafolio</h2>
+    </div>
+    <div class="grid grid-3 reveal">
+      <div class="panel counter-grid">
+        <div class="counter mono" data-counter data-target="5000" data-suffix="+">0</div>
+        <div class="counter-label">Videos editados</div>
+      </div>
+      <div class="panel counter-grid">
+        <div class="counter mono" data-counter data-target="30" data-suffix="+">0</div>
+        <div class="counter-label">Clientes</div>
+      </div>
+      <div class="panel counter-grid">
+        <div class="counter mono" data-counter data-target="100" data-suffix="M+">0</div>
+        <div class="counter-label">Vistas generadas</div>
+      </div>
+    </div>
+    <div class="client-tags reveal">
+      <span>Marcos Razzetti</span>
+      <span>Juan Carlos Guaqueta</span>
+      <span>Pablo Vazquez</span>
+      <span>David Otálora</span>
+    </div>
+  </section>
+
+  <!-- 07 — PREGUNTAS ABIERTAS -->
+  <section id="revision">
+    <div class="sec-head reveal">
+      <span class="sec-num">SYS.07</span>
+      <h2>Preguntas abiertas / en revisión</h2>
+    </div>
+    <div class="q-list reveal">
+      <div class="q-item">
+        <span class="q-mark mono">?</span>
+        <p>¿Mantener los 3 planes (mensual / trimestral / semestral) o simplificar la estructura de precios?</p>
+      </div>
+      <div class="q-item">
+        <span class="q-mark mono">?</span>
+        <p>Revisar el precio de clientes especiales / casos fuera del rango de margen estándar.</p>
+      </div>
+      <div class="q-item">
+        <span class="q-mark mono">?</span>
+        <p>Definir el desglose exacto de "comisión referidos / otros costos" (~$1.055 en julio, calculado por diferencia).</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Panel interno de referencia — no es un dato en vivo. Snapshot financiero: julio 2026. Generado para uso personal.
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+<script>
+  // ---------- scroll reveal ----------
+  const revealEls = document.querySelectorAll('.reveal');
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  revealEls.forEach(el => revealObserver.observe(el));
+
+  // ---------- animated counters ----------
+  function formatCounter(value, el) {
+    const prefix = el.dataset.prefix || '';
+    const suffix = el.dataset.suffix || '';
+    const rounded = Math.round(value);
+    const formatted = rounded.toLocaleString('en-US');
+    return prefix + formatted + suffix;
+  }
+
+  function runCounter(el) {
+    const target = parseFloat(el.dataset.target);
+    const duration = 1400;
+    const start = performance.now();
+    function tick(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = formatCounter(target * eased, el);
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  const counterEls = document.querySelectorAll('[data-counter]');
+  const counterObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        runCounter(entry.target);
+        counterObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.4 });
+  counterEls.forEach(el => counterObserver.observe(el));
+
+  // ---------- chart.js shared theme ----------
+  const inkSecondary = '#93a4b8';
+  const gridColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.font.family = "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace";
+  Chart.defaults.color = inkSecondary;
+  Chart.defaults.font.size = 12;
+
+  const dataColors = {
+    c1: '#0891b2', // cyan
+    c2: '#a21caf', // magenta
+    c3: '#15803d', // green
+    c4: '#b45309'  // amber
+  };
+
+  const tooltipBase = {
+    backgroundColor: '#0d1220',
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    titleColor: '#eef3f8',
+    bodyColor: '#93a4b8',
+    padding: 10,
+    displayColors: true,
+  };
+
+  // 1. Reparto ganancia neta (donut)
+  new Chart(document.getElementById('chartReparto'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Rafael', 'Fondo de reserva'],
+      datasets: [{
+        data: [2173, 931],
+        backgroundColor: [dataColors.c1, dataColors.c2],
+        borderColor: '#0a0e16',
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipBase, callbacks: {
+          label: (ctx) => ` ${ctx.label}: $${ctx.parsed.toLocaleString('en-US')}`
+        } }
+      }
+    }
+  });
+
+  // 4. Desglose de costos (donut)
+  new Chart(document.getElementById('chartCostos'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Edición', 'Comisión referidos / otros*', 'Ganancia neta', 'Software'],
+      datasets: [{
+        data: [2350, 1055, 3080, 119],
+        backgroundColor: [dataColors.c1, dataColors.c2, dataColors.c3, dataColors.c4],
+        borderColor: '#0a0e16',
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '60%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipBase, callbacks: {
+          label: (ctx) => ` ${ctx.label}: $${ctx.parsed.toLocaleString('en-US')}`
+        } }
+      }
+    }
+  });
+
+  // 2. Margen % por cliente (horizontal bar, ordenado desc)
+  const margenes = [
+    { name: 'Sebas Struck', value: 56 },
+    { name: 'Tatiana Mejia', value: 53 },
+    { name: 'Ilich Delgado', value: 52 },
+    { name: 'Santiago Canción', value: 46 },
+    { name: 'Juan Carlos Guaqueta', value: 40 },
+    { name: 'NOVA', value: 35 },
+    { name: 'Sergio Hernández', value: 34 },
+  ];
+  new Chart(document.getElementById('chartMargenes'), {
+    type: 'bar',
+    data: {
+      labels: margenes.map(m => m.name),
+      datasets: [{
+        data: margenes.map(m => m.value),
+        backgroundColor: dataColors.c1,
+        borderRadius: 3,
+        maxBarThickness: 22,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { callback: (v) => v + '%' }, suggestedMax: 60 },
+        y: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipBase, callbacks: {
+          label: (ctx) => ` Margen: ${ctx.parsed.x}%`
+        } }
+      }
+    }
+  });
+
+  // 3. Pago a editores (bar)
+  const editores = [
+    { name: 'Tomas', value: 1280 },
+    { name: 'Hernan', value: 860 },
+    { name: 'Ada', value: 180 },
+    { name: 'Janer', value: 30 },
+  ];
+  new Chart(document.getElementById('chartEditores'), {
+    type: 'bar',
+    data: {
+      labels: editores.map(e => e.name),
+      datasets: [{
+        data: editores.map(e => e.value),
+        backgroundColor: dataColors.c2,
+        borderRadius: 3,
+        maxBarThickness: 40,
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: gridColor }, ticks: { callback: (v) => '$' + v } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipBase, callbacks: {
+          label: (ctx) => ` Pago: $${ctx.parsed.y.toLocaleString('en-US')}`
+        } }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
