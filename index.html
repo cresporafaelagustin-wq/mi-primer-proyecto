@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hola Mundo</title>
+<style>
+  body {
+    height: 100vh;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+  }
+
+  h1 {
+    color: #333;
+  }
+
+  #colorButton {
+    padding: 12px 24px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: #4caf50;
+    color: white;
+    transition: background-color 0.2s ease;
+  }
+</style>
+</head>
+<body>
+  <h1>Hola Mundo</h1>
+  <button id="colorButton">Cambiar color</button>
+
+  <script>
+    const colors = ["#4caf50", "#2196f3", "#f44336", "#ff9800", "#9c27b0", "#009688"];
+    const button = document.getElementById("colorButton");
+
+    button.addEventListener("click", () => {
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      button.style.backgroundColor = randomColor;
+    });
+  </script>
+</body>
+</html>
