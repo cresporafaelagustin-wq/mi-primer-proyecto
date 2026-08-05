@@ -3,709 +3,1719 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Interno — Rafael Agustín Crespo</title>
+<title>SCA · Panel de Producción</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' rx='14' fill='%23111110'/%3E%3Ctext x='50' y='60' font-family='Georgia,serif' font-size='32' font-weight='700' fill='%23F5F4EF' text-anchor='middle'%3ESCA%3C/text%3E%3C/svg%3E">
 <style>
-  :root {
-    --bg-plane:        #05070c;
-    --bg-surface:      #0a0e16;
-    --bg-surface-2:    #0d1220;
-    --line:            rgba(255,255,255,0.08);
-    --line-strong:     rgba(255,255,255,0.14);
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,900;1,500;1,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-    --ink-primary:     #eef3f8;
-    --ink-secondary:   #93a4b8;
-    --ink-muted:       #5b6b80;
+:root{
+  --paper: #F1F0EC;
+  --ink: #111110;
+  --paper-line: #D8D6CE;
+  --ink-soft: #5C5B54;
+  --cream: #F5F4EF;
+  --divider-dark: #3A3B33;
+  --radius: 0px;
+}
 
-    /* UI / glow tints — bright, for chrome, text, borders */
-    --cyan:            #22d3ee;
-    --cyan-dim:        #0891b2;
-    --magenta:         #e879f9;
-    --magenta-dim:     #a21caf;
-    --green:           #4ade80;
-    --green-dim:       #15803d;
-    --amber:           #fbbf24;
-    --amber-dim:       #b45309;
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background: var(--paper);
+  color: var(--ink);
+  font-family:'Inter', sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.serif{ font-family:'Playfair Display', serif; }
+.mono{ font-family:'IBM Plex Mono', monospace; letter-spacing:0.06em; text-transform:uppercase; }
+a{ color:inherit; }
+#app{ min-height:100vh; display:flex; flex-direction:column; position:relative; }
 
-    /* validated data-mark fills (categorical, dark-mode, CVD-checked) */
-    --data-1: #0891b2; /* cyan   */
-    --data-2: #a21caf; /* magenta*/
-    --data-3: #15803d; /* green  */
-    --data-4: #b45309; /* amber  */
-  }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:var(--paper-line); }
 
-  * { box-sizing: border-box; }
+/* ============ SECTION TAG PATTERN ============ */
+.section-tag{
+  font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+  color: var(--ink-soft); margin:0 0 8px; display:block;
+}
+.section-tag.on-dark{ color: rgba(245,244,239,0.6); }
+.section-title{
+  font-family:'Playfair Display', serif; font-weight:600; font-size:26px; margin:0; line-height:1.15;
+}
+.section-title.on-dark{ color: var(--cream); }
 
-  html { scroll-behavior: smooth; }
+/* ============ LOGIN ============ */
+.login-screen{
+  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  background: var(--paper);
+}
+.login-card{ width:100%; max-width:460px; }
+.login-wordmark{
+  font-family:'Playfair Display', serif; font-weight:900; font-size:15px; letter-spacing:0.03em;
+  margin-bottom:34px;
+}
+.login-title{ font-family:'Playfair Display', serif; font-style:italic; font-weight:600; font-size:32px; margin:0 0 10px; line-height:1.2; }
+.login-sub{ color:var(--ink-soft); font-size:14.5px; line-height:1.6; margin:0 0 30px; max-width:400px; }
+.login-section-label{ font-size:11px; margin:26px 0 10px; }
+.role-list{ display:flex; flex-direction:column; }
+.role-btn{
+  display:flex; align-items:center; justify-content:space-between; width:100%;
+  background:var(--paper); border:1px solid var(--ink); color:var(--ink);
+  padding:15px 18px; cursor:pointer; font-size:14px; font-family:'Inter',sans-serif; font-weight:500;
+  text-align:left; margin-top:-1px; transition:background .12s, color .12s;
+}
+.role-btn:hover{ background:var(--ink); color:var(--cream); }
+.role-btn:disabled{ opacity:0.55; cursor:default; }
+.role-btn .tag{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; opacity:0.6; }
+.admin-btn{ background:var(--ink); color:var(--cream); margin-bottom:0; }
+.admin-btn:hover{ background:var(--ink); filter:brightness(1.3); color:var(--cream); }
+.empty-note{ color:var(--ink-soft); font-size:13.5px; line-height:1.6; }
+.login-error{ color:var(--ink); font-size:12.5px; line-height:1.5; margin:-10px 0 16px; border-left:2px solid var(--ink); padding-left:10px; }
 
-  body {
-    margin: 0;
-    background: var(--bg-plane);
-    color: var(--ink-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.5;
-    background-image:
-      linear-gradient(rgba(34,211,238,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(34,211,238,0.035) 1px, transparent 1px);
-    background-size: 42px 42px;
-    background-attachment: fixed;
-  }
+/* ============ FORM ELEMENTS ============ */
+input, select, textarea{
+  background: var(--paper); border:1px solid var(--paper-line); color:var(--ink);
+  padding:10px 12px; border-radius:0; font-size:13.5px; font-family:'Inter',sans-serif; width:100%;
+}
+input::placeholder{ color:#A6A49B; }
+input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--ink); }
+label.field-label{
+  font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft); text-transform:uppercase;
+  letter-spacing:0.07em; margin-bottom:6px; display:block;
+}
+.field{ margin-bottom:15px; }
+.field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.field-hint{ font-size:12px; color:var(--ink-soft); margin:6px 0 0; line-height:1.5; }
 
-  .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace; }
+button.btn{
+  font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; cursor:pointer;
+  border-radius:0; padding:11px 18px; border:1px solid var(--ink); text-transform:uppercase; letter-spacing:0.05em;
+  transition: background .12s, color .12s;
+}
+button.btn:disabled{ opacity:0.5; cursor:default; }
+.btn-primary{ background:var(--ink); color:var(--cream); }
+.btn-primary:hover{ filter:brightness(1.25); }
+.btn-ghost{ background:transparent; border-color:var(--ink); color:var(--ink); }
+.btn-ghost:hover{ background:var(--ink); color:var(--cream); }
+.btn-danger{ background:transparent; border-color:var(--ink-soft); color:var(--ink-soft); }
+.btn-danger:hover{ border-color:var(--ink); color:var(--ink); background:var(--paper-line); }
+.btn-sm{ padding:8px 13px; font-size:11px; }
+.on-dark .btn-ghost{ border-color:var(--cream); color:var(--cream); }
+.on-dark .btn-ghost:hover{ background:var(--cream); color:var(--ink); }
 
-  a { color: var(--cyan); }
+/* ============ TOPBAR (dark / masthead) ============ */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 28px; background:var(--ink); color:var(--cream); border-bottom:1px solid var(--divider-dark);
+  position:sticky; top:0; z-index:5;
+}
+.topbar-left{ display:flex; align-items:baseline; gap:14px; }
+.wordmark{ font-family:'Playfair Display', serif; font-weight:900; font-size:19px; letter-spacing:0.02em; }
+.topbar-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,244,239,0.55); }
+.topbar-right{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.user-badge{
+  display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--cream);
+  font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; text-transform:uppercase;
+  border:1px solid var(--divider-dark); padding:7px 13px;
+}
+.user-dot{ width:6px; height:6px; background:var(--cream); }
+.user-dot.admin{ background:var(--cream); }
 
-  /* ---------- layout shells ---------- */
-  .wrap {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 0 24px 80px;
-  }
+.tabs{ display:flex; gap:0; padding:0 28px; border-bottom:1px solid var(--paper-line); background:var(--paper); overflow-x:auto; }
+.tab-btn{
+  padding:14px 18px; background:none; border:none; color:var(--ink-soft); font-size:12.5px;
+  cursor:pointer; border-bottom:2px solid transparent; font-family:'Inter',sans-serif; font-weight:600;
+  text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
+}
+.tab-btn.active{ color:var(--ink); border-bottom-color:var(--ink); }
+.tab-btn:hover{ color:var(--ink); }
 
-  header.hero {
-    position: relative;
-    padding: 56px 24px 40px;
-    border-bottom: 1px solid var(--line);
-    overflow: hidden;
-  }
-  header.hero::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 20% 0%, rgba(34,211,238,0.10), transparent 55%),
-      radial-gradient(ellipse at 85% 30%, rgba(232,121,249,0.08), transparent 55%);
-    pointer-events: none;
-  }
-  .hero-inner { max-width: 1180px; margin: 0 auto; position: relative; }
-  .status-row {
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-    margin-bottom: 18px;
-  }
-  .badge {
-    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 5px 10px;
-    border: 1px solid var(--line-strong);
-    color: var(--ink-secondary);
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-    background: rgba(255,255,255,0.02);
-  }
-  .badge.live { color: var(--green); border-color: rgba(74,222,128,0.35); }
-  .badge.live::before { content: "● "; }
-  .badge.warn { color: var(--amber); border-color: rgba(251,191,36,0.35); }
+.main{ flex:1; padding:32px 28px 70px; max-width:1120px; width:100%; margin:0 auto; }
+.section-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
 
-  h1.title {
-    font-size: clamp(28px, 4vw, 44px);
-    margin: 0 0 8px;
-    letter-spacing: -0.01em;
-  }
-  .title .accent { color: var(--cyan); text-shadow: 0 0 18px rgba(34,211,238,0.45); }
-  p.subtitle {
-    color: var(--ink-secondary);
-    font-size: 15px;
-    max-width: 640px;
-    margin: 0;
-  }
+/* ============ STAT PLATES (dark cards on light page) ============ */
+.stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px; margin-bottom:34px; background:var(--paper-line); border:1px solid var(--paper-line); }
+.stat-card{ background:var(--ink); color:var(--cream); padding:20px 20px; }
+.stat-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(245,244,239,0.55); margin-bottom:10px; }
+.stat-value{ font-size:23px; font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--cream); }
 
-  /* ---------- section chrome ---------- */
-  section { padding: 56px 0; border-bottom: 1px solid var(--line); }
-  section:last-of-type { border-bottom: none; }
+/* ============ DATA TABLE ============ */
+.data-table{ width:100%; border-collapse:collapse; background:var(--paper); border:1px solid var(--paper-line); }
+.data-table th{
+  text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft);
+  padding:11px 15px; border-bottom:1px solid var(--ink); background:var(--paper);
+}
+.data-table td{ padding:13px 15px; border-bottom:1px solid var(--paper-line); font-size:13.5px; }
+.data-table tr:last-child td{ border-bottom:none; }
+.data-table td.mono{ font-family:'IBM Plex Mono',monospace; text-transform:none; letter-spacing:0; }
 
-  .sec-head {
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-  .sec-num {
-    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    font-size: 13px;
-    color: var(--cyan);
-    border: 1px solid rgba(34,211,238,0.35);
-    padding: 3px 8px;
-    clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 0 5px);
-    box-shadow: 0 0 12px rgba(34,211,238,0.15);
-  }
-  .sec-head h2 {
-    font-size: 20px;
-    margin: 0;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-  }
-  .sec-note { color: var(--ink-muted); font-size: 13px; margin-top: -18px; margin-bottom: 24px; }
+/* ============ FILTER BAR ============ */
+.filter-bar{ display:flex; gap:0; flex-wrap:wrap; margin-bottom:20px; border:1px solid var(--paper-line); }
+.filter-bar select{ width:auto; min-width:170px; border:none; border-right:1px solid var(--paper-line); }
+.filter-bar select:last-child{ border-right:none; }
+.filter-bar select:focus{ outline:none; }
 
-  /* fade-in on scroll */
-  .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.6s ease, transform 0.6s ease; }
-  .reveal.visible { opacity: 1; transform: translateY(0); }
+/* ============ TASK GRID / CARDS ============ */
+.task-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; }
+.task-card{ background:var(--paper); border:1px solid var(--ink); padding:20px 22px; display:flex; flex-direction:column; gap:14px; }
+.task-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.task-project{ font-family:'Playfair Display', serif; font-weight:600; font-size:18px; line-height:1.2; }
+.task-client{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin-top:6px; }
 
-  /* ---------- panel / card ---------- */
-  .grid { display: grid; gap: 18px; }
-  .grid-3 { grid-template-columns: repeat(3, 1fr); }
-  .grid-2 { grid-template-columns: repeat(2, 1fr); }
-  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+.status-tag{
+  font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+  padding:5px 10px; white-space:nowrap; border:1px solid var(--ink);
+}
+.status-pendiente{ background:transparent; color:var(--ink-soft); border-color:var(--paper-line); }
+.status-progreso{ background:transparent; color:var(--ink); border-color:var(--ink); }
+.status-completado{ background:var(--ink); color:var(--cream); }
+.status-atrasado{ background:var(--ink); color:var(--cream); border-width:2px; }
 
-  .panel {
-    background: linear-gradient(180deg, var(--bg-surface), var(--bg-surface-2));
-    border: 1px solid var(--line-strong);
-    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-    padding: 22px;
-    position: relative;
-  }
-  .panel::after {
-    content: "";
-    position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, var(--cyan), transparent 60%);
-    opacity: 0.5;
-  }
-  .panel h3 {
-    margin: 0 0 12px;
-    font-size: 13px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--cyan);
-  }
-  .panel p, .panel li { color: var(--ink-secondary); font-size: 14.5px; }
-  .panel ul { margin: 0; padding-left: 18px; }
-  .panel li { margin-bottom: 6px; }
-  .panel.no-glow::after { display: none; }
-  .panel.magenta h3 { color: var(--magenta); }
-  .panel.magenta::after { background: linear-gradient(90deg, var(--magenta), transparent 60%); }
-  .panel.amber h3 { color: var(--amber); }
-  .panel.amber::after { background: linear-gradient(90deg, var(--amber), transparent 60%); }
-  .panel.green h3 { color: var(--green); }
-  .panel.green::after { background: linear-gradient(90deg, var(--green), transparent 60%); }
+.priority-tag{ font-family:'Inter',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:4px 9px; white-space:nowrap; border:1px solid var(--ink); }
+.priority-alta{ background:var(--ink); color:var(--cream); }
+.priority-media{ background:transparent; color:var(--ink); border-color:var(--ink); }
+.priority-baja{ background:transparent; color:var(--ink-soft); border-color:var(--paper-line); }
 
-  .pill {
-    display: inline-block;
-    font-family: ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--ink-muted);
-    border: 1px solid var(--line-strong);
-    padding: 2px 7px;
-    margin-right: 6px;
-    margin-bottom: 6px;
-  }
+.goal-box{ border:1px solid var(--ink); padding:22px 24px; }
+.goal-track{ height:14px; background:var(--paper-line); position:relative; margin:12px 0 8px; }
+.goal-fill{ height:100%; background:var(--ink); }
+.goal-pct{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; }
+.goal-message{ margin:16px 0 0; font-size:13.5px; color:var(--ink-soft); line-height:1.55; }
 
-  /* ---------- stat tiles ---------- */
-  .stat-tile {
-    text-align: left;
-  }
-  .stat-tile .label {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-muted);
-    margin-bottom: 10px;
-  }
-  .stat-tile .value {
-    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    font-size: clamp(26px, 3vw, 34px);
-    font-weight: 600;
-    color: var(--ink-primary);
-    text-shadow: 0 0 16px rgba(34,211,238,0.25);
-  }
-  .stat-tile .value.cyan { color: var(--cyan); }
-  .stat-tile .value.magenta { color: var(--magenta); }
-  .stat-tile .value.green { color: var(--green); text-shadow: 0 0 16px rgba(74,222,128,0.25); }
-  .stat-tile .sub { font-size: 12.5px; color: var(--ink-muted); margin-top: 6px; }
+.client-status-btn{
+  font-family:'Inter',sans-serif; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;
+  background:var(--ink); color:var(--cream); border:1px solid var(--ink); padding:7px 12px; cursor:pointer;
+  border-radius:0; transition:filter .12s;
+}
+.client-status-btn:hover{ filter:brightness(1.3); }
 
-  @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 0 rgba(34,211,238,0); }
-    50% { box-shadow: 0 0 22px rgba(34,211,238,0.18); }
-  }
-  .pulse { animation: pulseGlow 3.2s ease-in-out infinite; }
+.client-suggestions{ position:absolute; top:100%; left:0; right:0; background:var(--paper); border:1px solid var(--ink); max-height:220px; overflow-y:auto; z-index:60; }
+.client-suggestion-item{ padding:9px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--paper-line); }
+.client-suggestion-item:last-child{ border-bottom:none; }
+.client-suggestion-item:hover{ background:var(--paper-line); }
 
-  /* ---------- pricing ---------- */
-  .price-card {
-    text-align: center;
-    position: relative;
-  }
-  .price-card .plan { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
-  .price-card .amount {
-    font-family: ui-monospace, monospace;
-    font-size: 32px;
-    margin: 10px 0;
-    color: var(--cyan);
-  }
-  .price-card .desc { font-size: 13px; color: var(--ink-secondary); }
+.task-meta{ display:flex; flex-wrap:wrap; gap:6px 20px; font-size:12px; color:var(--ink-soft); }
+.task-meta .mono{ color:var(--ink); text-transform:none; letter-spacing:0; font-size:12.5px; }
 
-  /* ---------- charts ---------- */
-  .chart-card canvas { max-height: 260px; }
-  .legend-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
-  .legend-list li { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-secondary); }
-  .dot { width: 9px; height: 9px; display: inline-block; flex: none; }
+/* unit ficha grid (video units) */
+.unit-grid{ display:flex; flex-wrap:wrap; gap:3px; }
+.unit{
+  width:24px; height:24px; border:1px solid var(--paper-line); display:flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--ink-soft); background:var(--paper);
+}
+.unit.done{ background:var(--ink); color:var(--cream); border-color:var(--ink); }
+.unit-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft); margin-top:6px; letter-spacing:0.04em; }
 
-  /* ---------- portfolio counters ---------- */
-  .counter-grid { text-align: center; }
-  .counter { font-family: ui-monospace, monospace; font-size: clamp(30px, 4.5vw, 48px); color: var(--cyan); text-shadow: 0 0 20px rgba(34,211,238,0.3); }
-  .counter-label { color: var(--ink-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 8px; }
-  .client-tags { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 28px; }
-  .client-tags span {
-    font-size: 13px; color: var(--ink-primary);
-    border: 1px solid var(--line-strong);
-    padding: 6px 14px;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-  }
+.task-links{ display:flex; flex-direction:column; gap:7px; }
+.link-row{ display:flex; align-items:center; gap:9px; }
+.link-row .field-label-inline{ font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); width:60px; flex-shrink:0; }
+.link-row input{ font-size:12.5px; padding:8px 10px; }
+.link-row a.open-link{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink); text-decoration:underline; white-space:nowrap; }
 
-  /* ---------- open questions ---------- */
-  .q-list { display: flex; flex-direction: column; gap: 12px; }
-  .q-item {
-    display: flex; gap: 12px; align-items: flex-start;
-    border: 1px solid var(--line-strong);
-    padding: 14px 16px;
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    background: rgba(255,255,255,0.015);
-  }
-  .q-item .q-mark {
-    font-family: ui-monospace, monospace;
-    color: var(--amber);
-    border: 1px solid rgba(251,191,36,0.35);
-    padding: 2px 7px;
-    font-size: 11px;
-    flex: none;
-  }
-  .q-item p { margin: 0; color: var(--ink-secondary); font-size: 14.5px; }
+.task-footer{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; border-top:1px solid var(--paper-line); padding-top:13px; margin-top:2px; gap:10px; }
+.rate-tag{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink); }
+.task-actions{ display:flex; flex-wrap:wrap; gap:6px; }
 
-  footer {
-    padding: 32px 0 0;
-    color: var(--ink-muted);
-    font-size: 12.5px;
-    text-align: center;
-  }
+.progress-editor{ display:flex; align-items:center; gap:10px; }
+.progress-editor input[type=range]{ flex:1; accent-color:var(--ink); }
+.progress-editor .mono{ text-transform:none; letter-spacing:0; }
 
-  @media (max-width: 900px) {
-    .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 620px) {
-    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-    .wrap { padding: 0 16px 60px; }
-  }
+/* ============ MODAL ============ */
+.modal-backdrop{ position:absolute; inset:0; min-height:100%; background:rgba(17,17,16,0.55); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
+.modal{ background:var(--paper); border:1px solid var(--ink); padding:30px 30px 24px; width:100%; max-width:490px; max-height:88vh; overflow-y:auto; }
+.modal h3{ font-family:'Playfair Display', serif; font-weight:600; font-size:21px; margin:0 0 20px; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:22px; border-top:1px solid var(--paper-line); padding-top:18px; }
+
+/* ============ MANAGE LIST (grid-with-lines technique) ============ */
+.manage-list{ display:flex; flex-direction:column; gap:1px; background:var(--paper-line); border:1px solid var(--paper-line); }
+.manage-row{ display:flex; align-items:center; justify-content:space-between; background:var(--paper); padding:15px 18px; gap:12px; flex-wrap:wrap; }
+.manage-row .name{ font-family:'Playfair Display', serif; font-weight:600; font-size:15.5px; }
+.manage-row .sub{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-top:4px; }
+
+.empty-state{ text-align:center; padding:60px 20px; border:1px dashed var(--paper-line); }
+.empty-state h3{ font-family:'Playfair Display', serif; font-weight:600; color:var(--ink); font-size:17px; margin-bottom:8px; }
+.empty-state p{ color:var(--ink-soft); font-size:13.5px; }
+
+.setup-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--paper); }
+.setup-card{ width:100%; max-width:560px; border:1px solid var(--ink); padding:30px 32px; }
+.setup-card code{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:var(--paper-line); padding:2px 6px; }
+.setup-card ol{ padding-left:20px; font-size:13.5px; line-height:1.8; color:var(--ink-soft); }
+
+@media (max-width:640px){
+  .field-row{ grid-template-columns:1fr; }
+  .topbar-eyebrow{ display:none; }
+  .task-grid{ grid-template-columns:1fr; }
+  .task-footer{ flex-direction:column; align-items:stretch; gap:12px; }
+  .task-actions{ flex-wrap:wrap; }
+  .task-actions .btn{ flex:1; min-width:0; }
+}
 </style>
 </head>
 <body>
+<div id="app"></div>
 
-<header class="hero">
-  <div class="hero-inner">
-    <div class="status-row">
-      <span class="badge live">Sistema activo</span>
-      <span class="badge warn">Snapshot puntual — julio 2026</span>
-      <span class="badge">Uso interno · no es material de venta</span>
-    </div>
-    <h1 class="title">Panel Interno — <span class="accent">Rafael Agustín Crespo</span></h1>
-    <p class="subtitle">Resumen de referencia rápida del negocio: modelo de servicio, equipo, precios y snapshot financiero. Documento informativo para uso personal, no un dashboard en vivo.</p>
-  </div>
-</header>
-
-<div class="wrap">
-
-  <!-- 01 — MODELO DE NEGOCIO -->
-  <section id="modelo">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.01</span>
-      <h2>Resumen del modelo de negocio</h2>
-    </div>
-    <div class="grid grid-3">
-      <div class="panel reveal">
-        <h3>Quién soy</h3>
-        <p>Rafael Agustín Crespo. Ofrezco edición de video + orientación de grabación para coaches e infoproductores de habla hispana que facturan +2K USD/mes.</p>
-      </div>
-      <div class="panel magenta reveal">
-        <h3>A quién le vendo</h3>
-        <p>Coaches e infoproductores hispanohablantes con facturación mensual superior a 2.000 USD, que necesitan contenido editado con criterio y un proceso de grabación ordenado.</p>
-      </div>
-      <div class="panel amber reveal">
-        <h3>Qué NO hago</h3>
-        <ul>
-          <li>Copywriting</li>
-          <li>Calendario de contenido</li>
-          <li>Publicación por el cliente</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- 02 — ESTRUCTURA DE SERVICIO -->
-  <section id="servicio">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.02</span>
-      <h2>Estructura de servicio</h2>
-    </div>
-    <div class="grid grid-2">
-      <div class="panel reveal">
-        <h3>Qué incluye</h3>
-        <ul>
-          <li>Orientación de grabación</li>
-          <li>Edición con criterio</li>
-          <li>Entrega organizada (Drive + tracker)</li>
-          <li>Seguimiento semanal</li>
-          <li>Acceso a Skool</li>
-          <li>Llamadas 1 a 1</li>
-        </ul>
-      </div>
-      <div class="panel reveal">
-        <h3>Capacidad y entrada de clientes</h3>
-        <p><strong class="mono" style="color:var(--cyan)">Máximo 10 clientes nuevos por mes.</strong></p>
-        <p>Canales de entrada: landing propia + Calendly, y referidos de clientes actuales.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 03 — ESTRUCTURA DE EQUIPO -->
-  <section id="equipo">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.03</span>
-      <h2>Estructura de equipo</h2>
-    </div>
-    <div class="grid grid-2">
-      <div class="panel reveal">
-        <h3>Editores</h3>
-        <p>~10 editores en el equipo. Pago por video editado, con tarifa variable según tipo de contenido:</p>
-        <span class="pill">Reels ~$8–21</span>
-        <span class="pill">Ads ~$10–17</span>
-        <span class="pill">VSL ~$95–250</span>
-        <span class="pill">Testimonios ~$4–9</span>
-      </div>
-      <div class="panel magenta reveal">
-        <h3>Ventas</h3>
-        <p>Yo cierro el 100% de las llamadas de diagnóstico. No se delega esta parte del proceso.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 04 — PRECIOS -->
-  <section id="precios">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.04</span>
-      <h2>Estructura de precios actual</h2>
-    </div>
-    <p class="sec-note reveal">⚠ En revisión — sujeto a cambios, ver sección 07.</p>
-    <div class="grid grid-3">
-      <div class="panel price-card reveal">
-        <div class="plan">Mensual</div>
-        <div class="amount mono">~$800<span style="font-size:14px;color:var(--ink-muted)">/mes</span></div>
-        <div class="desc">Sin compromiso de permanencia</div>
-      </div>
-      <div class="panel price-card reveal pulse">
-        <div class="plan">Trimestral</div>
-        <div class="amount mono">~$2.100</div>
-        <div class="desc">Descuento por compromiso de 3 meses</div>
-      </div>
-      <div class="panel price-card reveal">
-        <div class="plan">Semestral</div>
-        <div class="amount mono">~$3.900</div>
-        <div class="desc">Descuento por compromiso de 6 meses</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 05 — SNAPSHOT FINANCIERO -->
-  <section id="financiero">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.05</span>
-      <h2>Snapshot financiero</h2>
-    </div>
-    <p class="sec-note reveal">Datos reales de julio 2026, usados como ejemplo del modelo. Es una foto de un mes puntual, no una cifra en vivo ni un promedio.</p>
-
-    <div class="grid grid-4 reveal" style="margin-bottom:18px;">
-      <div class="panel stat-tile">
-        <div class="label">Ingreso facturado</div>
-        <div class="value cyan mono" data-counter data-target="6604" data-prefix="$">$0</div>
-      </div>
-      <div class="panel stat-tile green">
-        <div class="label">Ganancia neta</div>
-        <div class="value green mono" data-counter data-target="3080" data-prefix="$">$0</div>
-        <div class="sub">~47% de margen</div>
-      </div>
-      <div class="panel stat-tile">
-        <div class="label">Costo editores</div>
-        <div class="value mono" data-counter data-target="2350" data-prefix="$">$0</div>
-      </div>
-      <div class="panel stat-tile">
-        <div class="label">Gastos fijos software</div>
-        <div class="value mono" data-counter data-target="119" data-prefix="$">$0</div>
-        <div class="sub">Adobe, Frame, Highfield, Drive, Skool, Claude</div>
-      </div>
-    </div>
-
-    <div class="grid grid-2">
-      <div class="panel chart-card reveal">
-        <h3>Reparto de la ganancia neta</h3>
-        <canvas id="chartReparto"></canvas>
-        <ul class="legend-list">
-          <li><span class="dot" style="background:var(--data-1)"></span>Rafael (70%) — $2.173</li>
-          <li><span class="dot" style="background:var(--data-2)"></span>Fondo de reserva (30%) — $931</li>
-        </ul>
-      </div>
-      <div class="panel chart-card reveal">
-        <h3>Desglose de costos sobre el ingreso</h3>
-        <canvas id="chartCostos"></canvas>
-        <ul class="legend-list">
-          <li><span class="dot" style="background:var(--data-1)"></span>Edición — $2.350</li>
-          <li><span class="dot" style="background:var(--data-2)"></span>Comisión referidos / otros* — $1.055</li>
-          <li><span class="dot" style="background:var(--data-3)"></span>Ganancia neta — $3.080</li>
-          <li><span class="dot" style="background:var(--data-4)"></span>Software — $119</li>
-        </ul>
-        <p style="font-size:11.5px;color:var(--ink-muted);margin-top:10px;">*Calculado por diferencia (ingreso − edición − software − ganancia neta). El desglose exacto de esta partida está [PENDIENTE DE DEFINIR].</p>
-      </div>
-      <div class="panel chart-card reveal">
-        <h3>Margen % por cliente (julio, precio de lista)</h3>
-        <canvas id="chartMargenes"></canvas>
-      </div>
-      <div class="panel chart-card reveal">
-        <h3>Pago a editores (julio)</h3>
-        <canvas id="chartEditores"></canvas>
-        <p style="font-size:11.5px;color:var(--ink-muted);margin-top:10px;">Resto del equipo (~6 editores) sin facturación registrada ese mes.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 06 — PORTAFOLIO -->
-  <section id="portafolio">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.06</span>
-      <h2>Métricas de portafolio</h2>
-    </div>
-    <div class="grid grid-3 reveal">
-      <div class="panel counter-grid">
-        <div class="counter mono" data-counter data-target="5000" data-suffix="+">0</div>
-        <div class="counter-label">Videos editados</div>
-      </div>
-      <div class="panel counter-grid">
-        <div class="counter mono" data-counter data-target="30" data-suffix="+">0</div>
-        <div class="counter-label">Clientes</div>
-      </div>
-      <div class="panel counter-grid">
-        <div class="counter mono" data-counter data-target="100" data-suffix="M+">0</div>
-        <div class="counter-label">Vistas generadas</div>
-      </div>
-    </div>
-    <div class="client-tags reveal">
-      <span>Marcos Razzetti</span>
-      <span>Juan Carlos Guaqueta</span>
-      <span>Pablo Vazquez</span>
-      <span>David Otálora</span>
-    </div>
-  </section>
-
-  <!-- 07 — PREGUNTAS ABIERTAS -->
-  <section id="revision">
-    <div class="sec-head reveal">
-      <span class="sec-num">SYS.07</span>
-      <h2>Preguntas abiertas / en revisión</h2>
-    </div>
-    <div class="q-list reveal">
-      <div class="q-item">
-        <span class="q-mark mono">?</span>
-        <p>¿Mantener los 3 planes (mensual / trimestral / semestral) o simplificar la estructura de precios?</p>
-      </div>
-      <div class="q-item">
-        <span class="q-mark mono">?</span>
-        <p>Revisar el precio de clientes especiales / casos fuera del rango de margen estándar.</p>
-      </div>
-      <div class="q-item">
-        <span class="q-mark mono">?</span>
-        <p>Definir el desglose exacto de "comisión referidos / otros costos" (~$1.055 en julio, calculado por diferencia).</p>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    Panel interno de referencia — no es un dato en vivo. Snapshot financiero: julio 2026. Generado para uso personal.
-  </footer>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // ---------- scroll reveal ----------
-  const revealEls = document.querySelectorAll('.reveal');
-  const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        revealObserver.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.15 });
-  revealEls.forEach(el => revealObserver.observe(el));
+(function(){
+  /* ============================================================
+   * CONFIGURACIÓN DE SUPABASE
+   * Reemplazá estos dos valores por los de tu proyecto (Project
+   * Settings → API en el dashboard de Supabase). El anon key es
+   * público a propósito: la seguridad real la da Row Level
+   * Security (ver supabase/schema.sql), no el secreto de esta
+   * clave. Ver SUPABASE_SETUP.md para la guía completa.
+   * ============================================================ */
+  const SUPABASE_URL = 'TU_SUPABASE_URL_ACA';
+  const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_ACA';
 
-  // ---------- animated counters ----------
-  function formatCounter(value, el) {
-    const prefix = el.dataset.prefix || '';
-    const suffix = el.dataset.suffix || '';
-    const rounded = Math.round(value);
-    const formatted = rounded.toLocaleString('en-US');
-    return prefix + formatted + suffix;
-  }
+  const DEFAULT_ALERT_TEMPLATE = 'Atención: la tarea "{proyecto}" del cliente {cliente}, asignada a {editor}, está atrasada por {dias} día(s). Entrega prevista: {entrega}.';
 
-  function runCounter(el) {
-    const target = parseFloat(el.dataset.target);
-    const duration = 1400;
-    const start = performance.now();
-    function tick(now) {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      el.textContent = formatCounter(target * eased, el);
-      if (progress < 1) requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
-  }
+  const CLIENT_STATUSES = ['Activo','Baja/Cancelado','Casi-Cerrado','En Espera/Congelado','En Negociación','En Seguimiento (Post-Servicio)','Hacer seguimiento'];
 
-  const counterEls = document.querySelectorAll('[data-counter]');
-  const counterObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        runCounter(entry.target);
-        counterObserver.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.4 });
-  counterEls.forEach(el => counterObserver.observe(el));
-
-  // ---------- chart.js shared theme ----------
-  const inkSecondary = '#93a4b8';
-  const gridColor = 'rgba(255,255,255,0.06)';
-  Chart.defaults.font.family = "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace";
-  Chart.defaults.color = inkSecondary;
-  Chart.defaults.font.size = 12;
-
-  const dataColors = {
-    c1: '#0891b2', // cyan
-    c2: '#a21caf', // magenta
-    c3: '#15803d', // green
-    c4: '#b45309'  // amber
+  let state = {
+    ready: false,
+    configured: SUPABASE_URL.indexOf('TU_SUPABASE') !== 0 && SUPABASE_ANON_KEY.indexOf('TU_SUPABASE') !== 0,
+    session: null,
+    profile: null,
+    editors: [],
+    clients: [],
+    tasks: [],
+    notifySettings: { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE },
+    currentUser: null,
+    login: { step: 'request', email: '', code: '', error: '', loading: false },
+    activeTab: 'resumen',
+    filter: { editorId:'', clientId:'', status:'', priority:'', clientStatus:'', month:'' },
+    modal: null
   };
 
-  const tooltipBase = {
-    backgroundColor: '#0d1220',
-    borderColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    titleColor: '#eef3f8',
-    bodyColor: '#93a4b8',
-    padding: 10,
-    displayColors: true,
-  };
+  const app = document.getElementById('app');
 
-  // 1. Reparto ganancia neta (donut)
-  new Chart(document.getElementById('chartReparto'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Rafael', 'Fondo de reserva'],
-      datasets: [{
-        data: [2173, 931],
-        backgroundColor: [dataColors.c1, dataColors.c2],
-        borderColor: '#0a0e16',
-        borderWidth: 3,
-      }]
-    },
-    options: {
-      responsive: true,
-      cutout: '65%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { ...tooltipBase, callbacks: {
-          label: (ctx) => ` ${ctx.label}: $${ctx.parsed.toLocaleString('en-US')}`
-        } }
-      }
+  if(!state.configured){
+    app.innerHTML = `
+      <div class="setup-screen"><div class="setup-card">
+        <div class="login-wordmark">SCA</div>
+        <span class="section-tag">Configuración pendiente</span>
+        <h1 class="login-title" style="font-size:24px;">Falta conectar Supabase</h1>
+        <p class="login-sub" style="margin-bottom:16px;">Este panel todavía no tiene un proyecto de Supabase configurado.</p>
+        <ol>
+          <li>Creá un proyecto gratis en supabase.com.</li>
+          <li>Corré <code>supabase/schema.sql</code> en el SQL Editor del proyecto.</li>
+          <li>Copiá el <code>Project URL</code> y el <code>anon public key</code> desde Project Settings → API.</li>
+          <li>Pegalos en las constantes <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> al principio del script de este archivo.</li>
+        </ol>
+        <p class="empty-note">Ver <code>SUPABASE_SETUP.md</code> en la raíz del repo para la guía completa paso a paso.</p>
+      </div></div>`;
+    return;
+  }
+
+  if(!window.supabase || typeof window.supabase.createClient !== 'function'){
+    app.innerHTML = `
+      <div class="setup-screen"><div class="setup-card">
+        <div class="login-wordmark">SCA</div>
+        <span class="section-tag">Error de carga</span>
+        <h1 class="login-title" style="font-size:24px;">No se pudo cargar Supabase</h1>
+        <p class="login-sub" style="margin-bottom:0;">La librería de Supabase (cargada desde jsdelivr.net) no llegó a tiempo o está bloqueada en esta red. Revisá tu conexión y recargá la página.</p>
+      </div></div>`;
+    return;
+  }
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  /* ================= MAPPERS: fila de la base <-> objeto de la UI ================= */
+  function editorFromRow(r){
+    return { id: r.id, name: r.name, email: r.email || '', goal: Number(r.goal)||0, trackerLink: r.tracker_link || '' };
+  }
+  function clientFromRow(r){
+    return { id: r.id, name: r.name, status: r.status || '' };
+  }
+  function taskFromRow(r){
+    return {
+      id: r.id, project: r.project, clientId: r.client_id || '', editorId: r.editor_id || '',
+      videoCount: Number(r.video_count)||0, videosDone: Number(r.videos_done)||0,
+      priority: r.priority || 'media', deadline: r.deadline || '', pricePerVideo: Number(r.price_per_video)||0,
+      paid: !!r.paid, rawLink: r.raw_link || '', editedLink: r.edited_link || '', notes: r.notes || ''
+    };
+  }
+  function taskToRow(t){
+    return {
+      project: t.project, client_id: t.clientId || null, editor_id: t.editorId || null,
+      video_count: t.videoCount, videos_done: t.videosDone, priority: t.priority || 'media',
+      deadline: t.deadline || null, price_per_video: t.pricePerVideo, paid: !!t.paid,
+      raw_link: t.rawLink || '', edited_link: t.editedLink || '', notes: t.notes || ''
+    };
+  }
+
+  async function reloadData(){
+    const [editorsRes, clientsRes, tasksRes] = await Promise.all([
+      supabase.from('editors').select('*').order('name'),
+      supabase.from('clients').select('*').order('name'),
+      supabase.from('tasks').select('*').order('created_at')
+    ]);
+    state.editors = (editorsRes.data || []).map(editorFromRow);
+    state.clients = (clientsRes.data || []).map(clientFromRow);
+    state.tasks = (tasksRes.data || []).map(taskFromRow);
+
+    if(state.currentUser && state.currentUser.type === 'admin' && state.session){
+      const ns = await supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle();
+      state.notifySettings = ns.data
+        ? { email: ns.data.email || '', phone: ns.data.phone || '', template: ns.data.template || DEFAULT_ALERT_TEMPLATE }
+        : { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE };
     }
-  });
+  }
 
-  // 4. Desglose de costos (donut)
-  new Chart(document.getElementById('chartCostos'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Edición', 'Comisión referidos / otros*', 'Ganancia neta', 'Software'],
-      datasets: [{
-        data: [2350, 1055, 3080, 119],
-        backgroundColor: [dataColors.c1, dataColors.c2, dataColors.c3, dataColors.c4],
-        borderColor: '#0a0e16',
-        borderWidth: 3,
-      }]
-    },
-    options: {
-      responsive: true,
-      cutout: '60%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { ...tooltipBase, callbacks: {
-          label: (ctx) => ` ${ctx.label}: $${ctx.parsed.toLocaleString('en-US')}`
-        } }
-      }
+  async function withBusy(fn){
+    try{ await fn(); }
+    catch(e){ alert('No se pudo completar la acción: ' + (e && e.message ? e.message : e)); }
+  }
+
+  /* ================= AUTH ================= */
+  async function fetchProfile(userId, attempt){
+    attempt = attempt || 0;
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if(!data && attempt < 3){
+      await new Promise(res => setTimeout(res, 600));
+      return fetchProfile(userId, attempt + 1);
     }
-  });
+    return data;
+  }
 
-  // 2. Margen % por cliente (horizontal bar, ordenado desc)
-  const margenes = [
-    { name: 'Sebas Struck', value: 56 },
-    { name: 'Tatiana Mejia', value: 53 },
-    { name: 'Ilich Delgado', value: 52 },
-    { name: 'Santiago Canción', value: 46 },
-    { name: 'Juan Carlos Guaqueta', value: 40 },
-    { name: 'NOVA', value: 35 },
-    { name: 'Sergio Hernández', value: 34 },
+  async function handleSession(session){
+    state.session = session || null;
+    if(!session){
+      state.currentUser = null;
+      state.profile = null;
+      state.ready = true;
+      render();
+      return;
+    }
+    const profile = await fetchProfile(session.user.id);
+    state.profile = profile || null;
+    if(!profile){
+      state.currentUser = { type: 'unlinked' };
+    } else if(profile.role === 'admin'){
+      state.currentUser = { type: 'admin' };
+    } else if(profile.role === 'editor' && profile.editor_id){
+      state.currentUser = { type: 'editor', id: profile.editor_id };
+    } else {
+      state.currentUser = { type: 'unlinked' };
+    }
+    if(state.currentUser.type !== 'unlinked'){
+      await reloadData();
+    }
+    state.ready = true;
+    render();
+  }
+
+  async function doLogout(){
+    await supabase.auth.signOut();
+  }
+
+  /* ================= HELPERS ================= */
+  function fmtMoney(n){ if(isNaN(n)) n=0; return '$' + Number(n).toLocaleString('es-AR', {maximumFractionDigits:2}); }
+  function fmtDate(d){
+    if(!d) return '—';
+    const dt = new Date(d + 'T00:00:00');
+    if(isNaN(dt.getTime())) return d;
+    return dt.toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' });
+  }
+  function isOverdue(task){
+    if(!task.deadline) return false;
+    if(task.videosDone >= task.videoCount) return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dl = new Date(task.deadline + 'T00:00:00');
+    return dl.getTime() < today.getTime();
+  }
+  function daysOverdue(task){
+    if(!isOverdue(task)) return 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dl = new Date(task.deadline + 'T00:00:00');
+    return Math.round((today.getTime() - dl.getTime()) / 86400000);
+  }
+  function monthKey(dateStr){
+    if(!dateStr) return '';
+    return dateStr.slice(0,7); // 'YYYY-MM'
+  }
+  function monthLabel(key){
+    if(!key) return '';
+    const [y,m] = key.split('-');
+    const dt = new Date(Number(y), Number(m)-1, 1);
+    const label = dt.toLocaleDateString('es-AR', { month:'long', year:'numeric' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  function taskPaidAmount(t){ return t.paid ? Number(t.videosDone||0)*Number(t.pricePerVideo||0) : 0; }
+  function taskStatus(task){
+    if(isOverdue(task)) return 'atrasado';
+    if(task.videosDone >= task.videoCount && task.videoCount > 0) return 'completado';
+    if(task.videosDone > 0) return 'progreso';
+    return 'pendiente';
+  }
+  function statusLabel(s){
+    return { pendiente:'Pendiente', progreso:'En progreso', completado:'Completado', atrasado:'▲ Atrasado' }[s] || s;
+  }
+  function priorityRank(p){ return { alta:0, media:1, baja:2 }[p||'media'] ?? 1; }
+  function priorityLabel(p){ return { alta:'Alta', media:'Media', baja:'Baja' }[p||'media'] || 'Media'; }
+  function priorityDots(p){ return { alta:'●●●', media:'●●○', baja:'●○○' }[p||'media'] || '●●○'; }
+  function priorityTagHtml(p){
+    const pr = p || 'media';
+    return `<span class="priority-tag priority-${pr}">${priorityDots(pr)} ${priorityLabel(pr).toUpperCase()}</span>`;
+  }
+  function editorName(id){ const e = state.editors.find(x=>x.id===id); return e ? e.name : 'Sin asignar'; }
+  function clientName(id){ const c = state.clients.find(x=>x.id===id); return c ? c.name : 'Sin cliente'; }
+  function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function render(){
+    if(!state.ready){
+      app.innerHTML = '<div class="login-screen"><p class="empty-note">Cargando panel…</p></div>';
+      return;
+    }
+    if(!state.currentUser){ app.innerHTML = renderLogin(); attachLoginEvents(); return; }
+    if(state.currentUser.type === 'unlinked'){ app.innerHTML = renderUnlinked(); attachUnlinkedEvents(); return; }
+    let html = renderShell();
+    if(state.modal){ html += renderModal(); }
+    app.innerHTML = html;
+    attachShellEvents();
+    if(state.modal){ attachModalEvents(); }
+  }
+
+  /* ================= LOGIN (código por email, sin contraseña) ================= */
+  function renderLogin(){
+    const L = state.login;
+    const errorHtml = L.error ? `<p class="login-error">${escapeHtml(L.error)}</p>` : '';
+
+    if(L.step === 'sent'){
+      return `
+      <div class="login-screen">
+        <div class="login-card">
+          <div class="login-wordmark">SCA</div>
+          <span class="section-tag">Panel de producción</span>
+          <h1 class="login-title">Revisá tu email</h1>
+          <p class="login-sub">Te enviamos un código de 6 dígitos a <strong>${escapeHtml(L.email)}</strong>. Escribilo acá para entrar — no hace falta contraseña.</p>
+          <div class="field"><label class="field-label">Código</label><input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="input-otp-code" placeholder="123456" value="${escapeHtml(L.code)}"></div>
+          ${errorHtml}
+          <div class="role-list">
+            <button class="role-btn admin-btn" id="btn-verify-code" ${L.loading?'disabled':''}>${L.loading?'Verificando…':'Confirmar código'}</button>
+          </div>
+          <p class="empty-note" style="margin-top:18px;"><a href="#" id="btn-back-to-email">Usar otro email</a></p>
+        </div>
+      </div>`;
+    }
+
+    return `
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="login-wordmark">SCA</div>
+        <span class="section-tag">Panel de producción</span>
+        <h1 class="login-title">Iniciá sesión</h1>
+        <p class="login-sub">Ingresá tu email. Si sos administrador o ya te cargaron como editor con este email, te mandamos un código de acceso de 6 dígitos.</p>
+        <div class="field"><label class="field-label">Email</label><input type="email" id="input-login-email" placeholder="vos@ejemplo.com" value="${escapeHtml(L.email)}"></div>
+        ${errorHtml}
+        <div class="role-list">
+          <button class="role-btn admin-btn" id="btn-send-code" ${L.loading?'disabled':''}>${L.loading?'Enviando…':'Enviar código de acceso'}</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function attachLoginEvents(){
+    const emailInput = document.getElementById('input-login-email');
+    const sendBtn = document.getElementById('btn-send-code');
+    if(sendBtn) sendBtn.onclick = () => withBusy(async () => {
+      const email = (emailInput.value || '').trim().toLowerCase();
+      if(!email){ state.login.error = 'Ingresá un email.'; render(); return; }
+      state.login.loading = true; state.login.error = ''; render();
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      state.login.loading = false;
+      if(error){ state.login.error = error.message; render(); return; }
+      state.login.step = 'sent'; state.login.email = email; state.login.code = '';
+      render();
+    });
+
+    const codeInput = document.getElementById('input-otp-code');
+    const verifyBtn = document.getElementById('btn-verify-code');
+    const backLink = document.getElementById('btn-back-to-email');
+    if(verifyBtn) verifyBtn.onclick = () => withBusy(async () => {
+      const token = (codeInput.value || '').trim();
+      if(!token){ state.login.error = 'Ingresá el código que te llegó por email.'; render(); return; }
+      state.login.loading = true; state.login.error = ''; render();
+      const { error } = await supabase.auth.verifyOtp({ email: state.login.email, token, type: 'email' });
+      state.login.loading = false;
+      if(error){ state.login.error = 'Código incorrecto o vencido. Probá de nuevo.'; render(); return; }
+      // onAuthStateChange se encarga de cargar la sesión y renderizar.
+    });
+    if(backLink) backLink.onclick = (e) => { e.preventDefault(); state.login = { step:'request', email:'', code:'', error:'', loading:false }; render(); };
+  }
+
+  function renderUnlinked(){
+    const email = state.session && state.session.user ? state.session.user.email : '';
+    return `
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="login-wordmark">SCA</div>
+        <span class="section-tag">Panel de producción</span>
+        <h1 class="login-title">Cuenta sin vincular</h1>
+        <p class="login-sub">Entraste con <strong>${escapeHtml(email)}</strong> pero todavía no estás cargado como editor en este panel. Pedile al administrador que te agregue en la pestaña Editores con este mismo email.</p>
+        <div class="role-list"><button class="role-btn" id="btn-logout-unlinked">Salir</button></div>
+      </div>
+    </div>`;
+  }
+  function attachUnlinkedEvents(){
+    const btn = document.getElementById('btn-logout-unlinked');
+    if(btn) btn.onclick = () => withBusy(doLogout);
+  }
+
+  /* ================= SHELL ================= */
+  function renderShell(){
+    const isAdmin = state.currentUser.type === 'admin';
+    const userLabel = isAdmin ? 'Administrador' : editorName(state.currentUser.id);
+    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes']];
+    const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mis-proyecciones','Mis proyecciones']];
+    const tabs = isAdmin ? adminTabs : editorTabs;
+    const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${label}</button>`).join('');
+
+    return `
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="wordmark">SCA</div>
+        <span class="topbar-eyebrow">Sistema de contenido autónomo — panel interno</span>
+      </div>
+      <div class="topbar-right">
+        <div class="user-badge"><span class="user-dot"></span>${escapeHtml(userLabel)}</div>
+        ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-export-data" style="border-color:var(--cream);color:var(--cream);">Exportar datos</button>` : '' }
+        ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-import-backup" style="border-color:var(--cream);color:var(--cream);">Importar backup</button>` : '' }
+        <button class="btn btn-ghost btn-sm" id="btn-logout" style="border-color:var(--cream);color:var(--cream);">Salir</button>
+      </div>
+    </div>
+    <div class="tabs">${tabsHtml}</div>
+    <div class="main" id="main-content">${ isAdmin ? renderAdminTab() : renderEditorTab() }</div>`;
+  }
+
+  function exportData(){
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      editors: state.editors,
+      clients: state.clients,
+      tasks: state.tasks
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sca-panel-datos-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function attachShellEvents(){
+    document.getElementById('btn-logout').onclick = () => withBusy(doLogout);
+    const exportBtn = document.getElementById('btn-export-data');
+    if(exportBtn) exportBtn.onclick = exportData;
+    const importBtn = document.getElementById('btn-import-backup');
+    if(importBtn) importBtn.onclick = () => { state.modal = { kind:'import-backup' }; render(); };
+    document.querySelectorAll('.tab-btn').forEach(btn=>{ btn.onclick = () => { state.activeTab = btn.getAttribute('data-tab'); render(); }; });
+    attachContentEvents();
+  }
+
+  function buildAlertMessage(t){
+    const tpl = (state.notifySettings && state.notifySettings.template) || DEFAULT_ALERT_TEMPLATE;
+    return tpl
+      .replace(/{proyecto}/g, t.project || '')
+      .replace(/{cliente}/g, clientName(t.clientId))
+      .replace(/{editor}/g, editorName(t.editorId))
+      .replace(/{dias}/g, String(daysOverdue(t)))
+      .replace(/{entrega}/g, fmtDate(t.deadline));
+  }
+
+  function renderAlertas(){
+    const overdue = state.tasks.filter(t=>taskStatus(t)==='atrasado').sort((a,b)=>daysOverdue(b)-daysOverdue(a));
+    const ns = state.notifySettings || { email:'', phone:'', template: DEFAULT_ALERT_TEMPLATE };
+
+    const cards = overdue.map(t=>{
+      const msg = buildAlertMessage(t);
+      const mailHref = ns.email ? `mailto:${encodeURIComponent(ns.email)}?subject=${encodeURIComponent('Tarea atrasada: '+t.project)}&body=${encodeURIComponent(msg)}` : null;
+      const waHref = ns.phone ? `https://wa.me/${ns.phone.replace(/[^0-9]/g,'')}?text=${encodeURIComponent(msg)}` : null;
+      const dOver = daysOverdue(t);
+      return `
+      <div class="task-card">
+        <div class="task-top">
+          <div>
+            <div class="task-project">${escapeHtml(t.project)}</div>
+            <div class="task-client">${escapeHtml(clientName(t.clientId))} · ${escapeHtml(editorName(t.editorId))}</div>
+          </div>
+          <span class="status-tag status-atrasado">▲ ${dOver} día${dOver===1?'':'s'}</span>
+        </div>
+        <p style="margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5;">${escapeHtml(msg)}</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${ mailHref ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(mailHref)}">Enviar por email</a>` : '' }
+          ${ waHref ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(waHref)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>` : '' }
+          ${ !mailHref && !waHref ? `<span style="font-size:12px; color:var(--ink-soft);">Configurá tu email o teléfono más abajo para poder enviarlo.</span>` : '' }
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="section-head"><div><span class="section-tag">Atrasos</span><h2 class="section-title">Alertas</h2></div></div>
+      ${ overdue.length === 0 ? emptyState('No tenés tareas atrasadas', 'Cuando una tarea pase su fecha de entrega sin completarse, va a aparecer acá.') : `<div class="task-grid">${cards}</div>` }
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Configuración</span><h2 class="section-title">Dónde recibir los avisos</h2></div></div>
+      <div class="goal-box">
+        <div class="field-row">
+          <div class="field"><label class="field-label">Tu email</label><input type="text" id="input-notify-email" value="${escapeHtml(ns.email||'')}" placeholder="vos@ejemplo.com"></div>
+          <div class="field"><label class="field-label">Tu WhatsApp (con código de país, sin espacios)</label><input type="text" id="input-notify-phone" value="${escapeHtml(ns.phone||'')}" placeholder="Ej: 5491122334455"></div>
+        </div>
+        <div class="field"><label class="field-label">Mensaje — podés usar {proyecto} {cliente} {editor} {dias} {entrega}</label><textarea id="input-notify-template" rows="3">${escapeHtml(ns.template||DEFAULT_ALERT_TEMPLATE)}</textarea></div>
+        <button class="btn btn-primary btn-sm" id="btn-save-notify-settings">Guardar</button>
+        <p class="goal-message">Esto arma el mensaje automáticamente por cada tarea atrasada, pero no lo envía solo: tocás "Enviar por email" o "Enviar por WhatsApp" y se abre ya redactado, listo para mandar con un toque más.</p>
+      </div>
+    `;
+  }
+
+  function renderAdminTab(){
+    if(state.activeTab === 'resumen') return renderResumen();
+    if(state.activeTab === 'tareas') return renderTareas(true);
+    if(state.activeTab === 'alertas') return renderAlertas();
+    if(state.activeTab === 'editores') return renderEditoresManage();
+    if(state.activeTab === 'clientes') return renderClientesManage();
+    return '';
+  }
+  function renderEditorTab(){
+    if(state.activeTab === 'mis-proyecciones') return renderProyeccionesEditor();
+    if(state.activeTab === 'resumen') return renderResumenEditor();
+    return renderTareas(false);
+  }
+
+  function renderResumen(){
+    const allTasks = state.tasks;
+    const monthOptions = [...new Set(allTasks.map(t=>monthKey(t.deadline)).filter(Boolean))].sort();
+    const selectedMonth = state.filter.month;
+    const tasks = selectedMonth ? allTasks.filter(t=>monthKey(t.deadline)===selectedMonth) : allTasks;
+
+    const totalVideos = tasks.reduce((s,t)=>s+Number(t.videoCount||0),0);
+    const doneVideos = tasks.reduce((s,t)=>s+Number(t.videosDone||0),0);
+    const projected = tasks.reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
+    const generated = tasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const paidAmount = tasks.reduce((s,t)=>s+taskPaidAmount(t),0);
+    const pendingPayment = generated - paidAmount;
+
+    const overdueCount = state.tasks.filter(t=>taskStatus(t)==='atrasado').length;
+    const overdueBanner = overdueCount > 0 ? `
+      <div style="border:2px solid var(--ink); padding:14px 18px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <span style="font-size:13.5px;">▲ Tenés <strong>${overdueCount}</strong> tarea${overdueCount===1?'':'s'} atrasada${overdueCount===1?'':'s'}.</span>
+        <button class="btn btn-ghost btn-sm" data-goto-tab="alertas">Ver alertas</button>
+      </div>` : '';
+
+    const monthFilterHtml = monthOptions.length > 0 ? `
+      <div class="filter-bar">
+        <select id="filter-month">
+          <option value="">Todos los meses</option>
+          ${monthOptions.map(k=>`<option value="${k}" ${selectedMonth===k?'selected':''}>${monthLabel(k)}</option>`).join('')}
+        </select>
+      </div>` : '';
+
+    const editorCards = state.editors.map(ed => renderEditorSummaryCard(ed, selectedMonth)).join('');
+
+    return `
+      <div class="section-head"><div><span class="section-tag">01 — Estado general</span><h2 class="section-title">Resumen</h2></div></div>
+      ${overdueBanner}
+      ${monthFilterHtml}
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${state.clients.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Editores</div><div class="stat-value">${state.editors.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Videos en curso</div><div class="stat-value">${doneVideos}/${totalVideos}</div></div>
+        <div class="stat-card"><div class="stat-label">Generado${selectedMonth?' (mes)':' a la fecha'}</div><div class="stat-value">${fmtMoney(generated)}</div></div>
+        <div class="stat-card"><div class="stat-label">Ya pagado</div><div class="stat-value">${fmtMoney(paidAmount)}</div></div>
+        <div class="stat-card"><div class="stat-label">Pendiente de pago</div><div class="stat-value">${fmtMoney(pendingPayment)}</div></div>
+        <div class="stat-card"><div class="stat-label">Proyección${selectedMonth?' (mes)':' total'}</div><div class="stat-value">${fmtMoney(projected)}</div></div>
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">02 — Por editor</span><h2 class="section-title">Producción por persona</h2></div></div>
+      ${ state.editors.length === 0 ? emptyState('Todavía no hay editores', 'Agregá tu primer editor en la pestaña Editores.') : `<div class="task-grid">${editorCards}</div>` }
+    `;
+  }
+
+  function renderEditorSummaryCard(ed, selectedMonth){
+    let myTasks = state.tasks.filter(t=>t.editorId===ed.id);
+    if(selectedMonth) myTasks = myTasks.filter(t=>monthKey(t.deadline)===selectedMonth);
+    const pendingCount = myTasks.filter(t=>taskStatus(t)!=='completado').length;
+    const completedCount = myTasks.filter(t=>taskStatus(t)==='completado').length;
+    const overdueCount = myTasks.filter(t=>taskStatus(t)==='atrasado').length;
+    const videosRemaining = myTasks.reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
+    const videosDone = myTasks.reduce((s,t)=>s+Number(t.videosDone||0),0);
+    const earned = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const paidAmount = myTasks.reduce((s,t)=>s+taskPaidAmount(t),0);
+    const goal = Number(ed.goal||0);
+    const pct = goal > 0 ? Math.min(100, (earned/goal)*100) : 0;
+    const clientNames = [...new Set(myTasks.map(t=>clientName(t.clientId)))];
+
+    return `
+    <div class="task-card">
+      <div class="task-top">
+        <div>
+          <div class="task-project">${escapeHtml(ed.name)}</div>
+          <div class="task-client">${clientNames.length ? escapeHtml(clientNames.join(', ')) : 'Sin clientes asignados'}</div>
+        </div>
+        ${ overdueCount > 0 ? `<span class="status-tag status-atrasado">▲ ${overdueCount}</span>` : '' }
+      </div>
+
+      <div class="task-meta">
+        <span>Videos por hacer <span class="mono">${videosRemaining}</span></span>
+        <span>Completados <span class="mono">${videosDone}</span></span>
+        <span>Tareas pendientes <span class="mono">${pendingCount}</span></span>
+        <span>Tareas completadas <span class="mono">${completedCount}</span></span>
+      </div>
+
+      <div class="task-meta">
+        <span>Generado <span class="mono">${fmtMoney(earned)}</span></span>
+        <span>Pagado <span class="mono">${fmtMoney(paidAmount)}</span></span>
+        <span>Sin pagar <span class="mono">${fmtMoney(earned - paidAmount)}</span></span>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <span class="mono" style="font-size:11px;">Generado ${fmtMoney(earned)}</span>
+          <span class="mono" style="font-size:11px;">Meta ${fmtMoney(goal)}</span>
+        </div>
+        <div class="goal-track"><div class="goal-fill" style="width:${pct}%;"></div></div>
+        <div class="goal-pct">${pct.toFixed(0)}% de la meta</div>
+      </div>
+
+      <div class="link-row">
+        <span class="field-label-inline">Tracker</span>
+        ${ ed.trackerLink
+            ? `<a class="open-link" href="${escapeHtml(ed.trackerLink)}" target="_blank" rel="noopener">Abrir tracker</a>`
+            : `<span style="color:var(--ink-soft); font-size:12.5px;">Todavía no cargó un link</span>` }
+      </div>
+    </div>`;
+  }
+
+  function renderResumenEditor(){
+    const editor = state.editors.find(e=>e.id===state.currentUser.id);
+    const myTasks = state.tasks.filter(t=>t.editorId===state.currentUser.id);
+    const pending = myTasks.filter(t=>taskStatus(t)!=='completado');
+    const videosRemaining = myTasks.reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
+    const paidToDate = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const nextDeadline = pending.reduce((min,t)=> (t.deadline && (!min || t.deadline < min)) ? t.deadline : min, null);
+
+    const sortedPending = pending.slice().sort((a,b)=>{
+      const pa = priorityRank(a.priority), pb = priorityRank(b.priority);
+      if(pa !== pb) return pa - pb;
+      return (a.deadline||'9999').localeCompare(b.deadline||'9999');
+    });
+
+    const rows = sortedPending.map(t=>`
+      <tr>
+        <td>${priorityTagHtml(t.priority)}</td>
+        <td>${escapeHtml(t.project)}</td>
+        <td>${escapeHtml(clientName(t.clientId))}</td>
+        <td class="mono">${Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0)}</td>
+        <td class="mono">${fmtDate(t.deadline)}</td>
+      </tr>
+    `).join('');
+
+    const overdueCount = myTasks.filter(t=>taskStatus(t)==='atrasado').length;
+    const overdueBanner = overdueCount > 0 ? `
+      <div style="border:2px solid var(--ink); padding:14px 18px; margin-bottom:24px;">
+        <span style="font-size:13.5px;">▲ Tenés <strong>${overdueCount}</strong> tarea${overdueCount===1?'':'s'} atrasada${overdueCount===1?'':'s'}. Revisalas abajo.</span>
+      </div>` : '';
+
+    return `
+      <div class="section-head"><div><span class="section-tag">Tu resumen</span><h2 class="section-title">¿Qué tenés que hacer?</h2></div></div>
+      ${overdueBanner}
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Tareas pendientes</div><div class="stat-value">${pending.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Videos por hacer</div><div class="stat-value">${videosRemaining}</div></div>
+        <div class="stat-card"><div class="stat-label">Próxima entrega</div><div class="stat-value">${nextDeadline ? fmtDate(nextDeadline) : '—'}</div></div>
+        <div class="stat-card"><div class="stat-label">Generado a la fecha</div><div class="stat-value">${fmtMoney(paidToDate)}</div></div>
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">Ordenado por prioridad</span><h2 class="section-title">Tu lista de tareas</h2></div></div>
+      ${ sortedPending.length === 0 ? emptyState('No tenés tareas pendientes', 'Cuando agregues o te asignen una tarea, va a aparecer acá ordenada por prioridad y fecha de entrega.') : `
+      <table class="data-table">
+        <thead><tr><th>Prioridad</th><th>Proyecto</th><th>Cliente</th><th>Videos restantes</th><th>Entrega</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` }
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Tu meta</span><h2 class="section-title">Proyección de ingresos</h2></div></div>
+      ${ renderGoalWidget(editor, myTasks, false) }
+    `;
+  }
+
+  function renderGoalWidget(editor, myTasks, editable){
+    const goal = Number((editor && editor.goal) || 0);
+    const earned = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const projected = myTasks.reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
+    const totalVideosAssigned = myTasks.reduce((s,t)=>s+Number(t.videoCount||0),0);
+    const pct = goal > 0 ? Math.min(100, (earned/goal)*100) : 0;
+
+    let message;
+    if(goal <= 0){
+      message = 'Definí una meta de dinero para ver qué te falta hacer para alcanzarla.';
+    } else if(earned >= goal){
+      message = 'Ya alcanzaste tu meta con lo que llevás generado.';
+    } else if(projected >= goal){
+      const remaining = goal - earned;
+      const avgPrice = totalVideosAssigned > 0 ? (projected/totalVideosAssigned) : 0;
+      const videosNeeded = avgPrice > 0 ? Math.ceil(remaining/avgPrice) : 0;
+      message = `Con las tareas que ya tenés asignadas alcanzás la meta. Te faltan aproximadamente ${videosNeeded} video${videosNeeded===1?'':'s'} más (${fmtMoney(remaining)}) para llegar.`;
+    } else {
+      const shortfall = goal - projected;
+      message = `Con las tareas asignadas ahora no llegás a la meta — te faltaría trabajo asignado por unos ${fmtMoney(shortfall)} más. Hablalo con tu administrador.`;
+    }
+
+    const editableHtml = editable ? `
+      <div class="field-row" style="margin-top:20px;">
+        <div class="field"><label class="field-label">Tu meta ($)</label><input type="number" min="0" step="0.01" id="input-goal-amount" value="${goal || ''}" placeholder="Ej: 300000"></div>
+        <div style="display:flex; align-items:flex-end;"><button class="btn btn-primary btn-sm" id="btn-save-goal" style="width:100%;">Guardar meta</button></div>
+      </div>` : '';
+
+    return `
+      <div class="goal-box">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <span class="mono" style="font-size:11px;">Meta ${fmtMoney(goal)}</span>
+          <span class="mono" style="font-size:11px;">${fmtMoney(earned)} / ${fmtMoney(goal)}</span>
+        </div>
+        <div class="goal-track"><div class="goal-fill" style="width:${pct}%;"></div></div>
+        <div class="goal-pct">${pct.toFixed(0)}% completado</div>
+        <p class="goal-message">${escapeHtml(message)}</p>
+        ${editableHtml}
+      </div>
+    `;
+  }
+
+  function renderProyeccionesEditor(){
+    const editor = state.editors.find(e=>e.id===state.currentUser.id);
+    const myTasks = state.tasks.filter(t=>t.editorId===state.currentUser.id);
+    const totalVideos = myTasks.reduce((s,t)=>s+Number(t.videoCount||0),0);
+    const doneVideos = myTasks.reduce((s,t)=>s+Number(t.videosDone||0),0);
+    const projected = myTasks.reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
+    const paidToDate = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const remaining = projected - paidToDate;
+
+    const rows = myTasks.map(t=>`
+      <tr><td>${escapeHtml(t.project)}</td><td>${escapeHtml(clientName(t.clientId))}</td><td class="mono">${t.videosDone}/${t.videoCount}</td><td class="mono">${fmtMoney(t.pricePerVideo)}</td><td class="mono">${fmtMoney(Number(t.videoCount||0)*Number(t.pricePerVideo||0))}</td></tr>
+    `).join('');
+
+    return `
+      <div class="section-head"><div><span class="section-tag">Tu meta</span><h2 class="section-title">Proyección de ingresos</h2></div></div>
+      ${ renderGoalWidget(editor, myTasks, true) }
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Tu tracker</span><h2 class="section-title">Link de seguimiento</h2></div></div>
+      <div class="goal-box">
+        <div class="field-row">
+          <div class="field"><label class="field-label">Link de tu tracker</label><input type="text" id="input-tracker-link" value="${escapeHtml(editor && editor.trackerLink || '')}" placeholder="https://..."></div>
+          <div style="display:flex; align-items:flex-end;"><button class="btn btn-primary btn-sm" id="btn-save-tracker" style="width:100%;">Guardar</button></div>
+        </div>
+        <p class="goal-message">Tu administrador va a poder ver este link desde su resumen, junto con tu avance.</p>
+      </div>
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Detalle</span><h2 class="section-title">Tus tareas y montos</h2></div></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Videos asignados</div><div class="stat-value">${doneVideos}/${totalVideos}</div></div>
+        <div class="stat-card"><div class="stat-label">Generado a la fecha</div><div class="stat-value">${fmtMoney(paidToDate)}</div></div>
+        <div class="stat-card"><div class="stat-label">Falta por generar</div><div class="stat-value">${fmtMoney(remaining)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total proyectado</div><div class="stat-value">${fmtMoney(projected)}</div></div>
+      </div>
+      ${ myTasks.length === 0 ? emptyState('No tenés tareas asignadas todavía', 'Cuando el administrador te asigne un proyecto, va a aparecer acá.') : `
+      <table class="data-table">
+        <thead><tr><th>Proyecto</th><th>Cliente</th><th>Videos</th><th>Precio/video</th><th>Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` }
+    `;
+  }
+
+  function renderTareas(isAdmin){
+    let tasks = state.tasks.slice();
+    if(!isAdmin){ tasks = tasks.filter(t=>t.editorId===state.currentUser.id); }
+    else {
+      if(state.filter.editorId) tasks = tasks.filter(t=>t.editorId===state.filter.editorId);
+      if(state.filter.clientId) tasks = tasks.filter(t=>t.clientId===state.filter.clientId);
+      if(state.filter.status) tasks = tasks.filter(t=>taskStatus(t)===state.filter.status);
+      if(state.filter.priority) tasks = tasks.filter(t=>(t.priority||'media')===state.filter.priority);
+    }
+    tasks.sort((a,b)=>{
+      const pa = priorityRank(a.priority), pb = priorityRank(b.priority);
+      if(pa !== pb) return pa - pb;
+      return (a.deadline||'9999').localeCompare(b.deadline||'9999');
+    });
+
+    const filterBar = isAdmin ? `
+      <div class="filter-bar">
+        <select id="filter-editor"><option value="">Todos los editores</option>${state.editors.map(e=>`<option value="${e.id}" ${state.filter.editorId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select>
+        <select id="filter-client"><option value="">Todos los clientes</option>${state.clients.map(c=>`<option value="${c.id}" ${state.filter.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+        <select id="filter-status">
+          <option value="">Todos los estados</option>
+          <option value="pendiente" ${state.filter.status==='pendiente'?'selected':''}>Pendiente</option>
+          <option value="progreso" ${state.filter.status==='progreso'?'selected':''}>En progreso</option>
+          <option value="completado" ${state.filter.status==='completado'?'selected':''}>Completado</option>
+          <option value="atrasado" ${state.filter.status==='atrasado'?'selected':''}>Atrasado</option>
+        </select>
+        <select id="filter-priority">
+          <option value="">Todas las prioridades</option>
+          <option value="alta" ${state.filter.priority==='alta'?'selected':''}>Alta</option>
+          <option value="media" ${state.filter.priority==='media'?'selected':''}>Media</option>
+          <option value="baja" ${state.filter.priority==='baja'?'selected':''}>Baja</option>
+        </select>
+      </div>` : '';
+
+    const addBtn = `<button class="btn btn-primary btn-sm" id="btn-new-task">+ Nueva tarea</button>`;
+    const cards = tasks.map(t => renderTaskCard(t, isAdmin)).join('');
+
+    return `
+      <div class="section-head">
+        <div><span class="section-tag">${isAdmin?'03 — Asignaciones':'Asignado a vos'}</span><h2 class="section-title">${isAdmin ? 'Tareas' : 'Mis tareas'}</h2></div>
+        ${addBtn}
+      </div>
+      ${filterBar}
+      ${ tasks.length === 0 ? emptyState(
+          isAdmin ? 'No hay tareas todavía' : 'Todavía no tenés tareas asignadas',
+          isAdmin ? 'Creá una tarea y asignala a un editor y un cliente.' : 'Tu administrador te va a asignar proyectos acá.'
+        ) : `<div class="task-grid">${cards}</div>` }
+    `;
+  }
+
+  function renderTaskCard(t, isAdmin){
+    const status = taskStatus(t);
+    const count = Math.max(Number(t.videoCount||0), 1);
+    const units = Array.from({length: count}).map((_,i)=> `<div class="unit ${i < Number(t.videosDone||0) ? 'done':''}">${String(i+1).padStart(2,'0')}</div>`).join('');
+    const totalAmount = Number(t.videoCount||0)*Number(t.pricePerVideo||0);
+    const generatedAmount = Number(t.videosDone||0)*Number(t.pricePerVideo||0);
+
+    return `
+    <div class="task-card">
+      <div class="task-top">
+        <div>
+          <div class="task-project">${escapeHtml(t.project)}</div>
+          <div class="task-client">${escapeHtml(clientName(t.clientId))}${isAdmin ? ' · ' + escapeHtml(editorName(t.editorId)) : ''}</div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+          <span class="status-tag status-${status}">${statusLabel(status)}</span>
+          ${priorityTagHtml(t.priority)}
+          ${ t.paid ? `<span class="status-tag" style="border-color:var(--ink); color:var(--ink-soft);">✓ Pagado</span>` : '' }
+        </div>
+      </div>
+
+      <div class="task-meta">
+        <span>Entrega <span class="mono">${fmtDate(t.deadline)}</span></span>
+        <span>Precio/video <span class="mono">${fmtMoney(t.pricePerVideo)}</span></span>
+      </div>
+
+      <div>
+        <div class="unit-grid">${units}</div>
+        <div class="unit-label">${t.videosDone||0} / ${t.videoCount||0} videos completados</div>
+      </div>
+
+      <div class="progress-editor">
+        <input type="range" min="0" max="${t.videoCount||0}" value="${t.videosDone||0}" data-progress-id="${t.id}">
+        <span class="mono" style="width:46px;text-align:right;">${t.videosDone||0}/${t.videoCount||0}</span>
+      </div>
+
+      <div class="task-links">
+        <div class="link-row">
+          <span class="field-label-inline">Crudo</span>
+          <input type="text" placeholder="Link del material crudo" value="${escapeHtml(t.rawLink||'')}" data-link-id="${t.id}" data-link-type="rawLink">
+          ${ t.rawLink ? `<a class="open-link" href="${escapeHtml(t.rawLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
+        </div>
+        <div class="link-row">
+          <span class="field-label-inline">Editado</span>
+          <input type="text" placeholder="Link del material editado" value="${escapeHtml(t.editedLink||'')}" data-link-id="${t.id}" data-link-type="editedLink">
+          ${ t.editedLink ? `<a class="open-link" href="${escapeHtml(t.editedLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
+        </div>
+      </div>
+
+      ${ t.notes ? `<p style="margin:0; font-size:12.5px; color:var(--ink-soft); line-height:1.5; border-top:1px solid var(--paper-line); padding-top:10px;">${escapeHtml(t.notes)}</p>` : '' }
+
+      <div class="task-footer">
+        <div>
+          <span class="rate-tag">TOTAL ${fmtMoney(totalAmount)}</span>
+          ${ isAdmin ? `<div class="mono" style="font-size:10px; color:var(--ink-soft); margin-top:3px; text-transform:none; letter-spacing:0;">Generado ${fmtMoney(generatedAmount)} ${t.paid ? '· ya pagado' : '· sin pagar'}</div>` : '' }
+        </div>
+        <div class="task-actions">
+          ${ isAdmin ? `<button class="btn btn-ghost btn-sm" data-toggle-paid="${t.id}">${t.paid ? 'Marcar sin pagar' : 'Marcar pagado'}</button>` : '' }
+          <button class="btn btn-ghost btn-sm" data-duplicate-task="${t.id}">Duplicar</button>
+          <button class="btn btn-ghost btn-sm" data-edit-task="${t.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-task="${t.id}">Eliminar</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderEditoresManage(){
+    const rows = state.editors.map(e=>{
+      const myTasks = state.tasks.filter(t=>t.editorId===e.id);
+      const n = myTasks.length;
+      const videosRemaining = myTasks.reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
+      const earned = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+      return `<div class="manage-row">
+        <div>
+          <div class="name">${escapeHtml(e.name)}</div>
+          <div class="sub">${n} tarea${n===1?'':'s'} asignada${n===1?'':'s'} · ${videosRemaining} video${videosRemaining===1?'':'s'} por hacer · ${fmtMoney(earned)} generado${ e.email ? ' · ' + escapeHtml(e.email) : ' · sin email (no puede iniciar sesión)' }</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${ e.trackerLink
+              ? `<a class="open-link" href="${escapeHtml(e.trackerLink)}" target="_blank" rel="noopener">Abrir tracker</a>`
+              : `<span class="mono" style="color:var(--ink-soft); font-size:10.5px;">Sin tracker</span>` }
+          <button class="btn btn-ghost btn-sm" data-edit-editor="${e.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-editor="${e.id}">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="section-head"><div><span class="section-tag">04 — Equipo</span><h2 class="section-title">Editores</h2></div><button class="btn btn-primary btn-sm" id="btn-new-editor">+ Nuevo editor</button></div>
+      ${ state.editors.length===0 ? emptyState('Todavía no hay editores', 'Agregá a las personas de tu equipo para poder asignarles tareas.') : `<div class="manage-list">${rows}</div>` }
+    `;
+  }
+
+  function renderClientesManage(){
+    let clients = state.clients.slice();
+    if(state.filter.clientStatus) clients = clients.filter(c => (c.status||'') === state.filter.clientStatus);
+
+    const rows = clients.map(c=>{
+      const n = state.tasks.filter(t=>t.clientId===c.id).length;
+      return `<div class="manage-row">
+        <div>
+          <div class="name">${escapeHtml(c.name)}</div>
+          <div class="sub">${n} tarea${n===1?'':'s'} asociada${n===1?'':'s'}</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="client-status-btn" data-assign-status="${c.id}">${c.status ? escapeHtml(c.status) : 'Asignar estado'}</button>
+          <button class="btn btn-ghost btn-sm" data-edit-client="${c.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-client="${c.id}">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const statusFilter = `
+      <div class="filter-bar">
+        <select id="filter-client-status">
+          <option value="">Todos los estados</option>
+          ${CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${state.filter.clientStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+        </select>
+      </div>`;
+
+    return `
+      <div class="section-head">
+        <div><span class="section-tag">05 — Cuentas</span><h2 class="section-title">Clientes</h2></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" id="btn-import-clients">Importar desde Sheets</button>
+          <button class="btn btn-primary btn-sm" id="btn-new-client">+ Nuevo cliente</button>
+        </div>
+      </div>
+      ${ state.clients.length > 0 ? statusFilter : '' }
+      ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Agregá tu primer cliente o importalos desde tu planilla de Sheets.') : `<div class="manage-list">${rows}</div>` }
+    `;
+  }
+
+  function emptyState(title, sub){ return `<div class="empty-state"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(sub)}</p></div>`; }
+
+  function attachContentEvents(){
+    const fe = document.getElementById('filter-editor'), fc = document.getElementById('filter-client'), fs = document.getElementById('filter-status'), fp = document.getElementById('filter-priority');
+    if(fe) fe.onchange = () => { state.filter.editorId = fe.value; render(); };
+    if(fc) fc.onchange = () => { state.filter.clientId = fc.value; render(); };
+    if(fs) fs.onchange = () => { state.filter.status = fs.value; render(); };
+    if(fp) fp.onchange = () => { state.filter.priority = fp.value; render(); };
+    const fcs = document.getElementById('filter-client-status');
+    if(fcs) fcs.onchange = () => { state.filter.clientStatus = fcs.value; render(); };
+    const fm = document.getElementById('filter-month');
+    if(fm) fm.onchange = () => { state.filter.month = fm.value; render(); };
+    document.querySelectorAll('[data-goto-tab]').forEach(btn=>{
+      btn.onclick = () => { state.activeTab = btn.getAttribute('data-goto-tab'); render(); };
+    });
+
+    const saveGoalBtn = document.getElementById('btn-save-goal');
+    if(saveGoalBtn) saveGoalBtn.onclick = () => withBusy(async () => {
+      const val = Number(document.getElementById('input-goal-amount').value) || 0;
+      const { error } = await supabase.from('editors').update({ goal: val }).eq('id', state.currentUser.id);
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
+
+    const saveTrackerBtn = document.getElementById('btn-save-tracker');
+    if(saveTrackerBtn) saveTrackerBtn.onclick = () => withBusy(async () => {
+      const val = document.getElementById('input-tracker-link').value.trim();
+      const { error } = await supabase.from('editors').update({ tracker_link: val }).eq('id', state.currentUser.id);
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
+
+    const saveNotifyBtn = document.getElementById('btn-save-notify-settings');
+    if(saveNotifyBtn) saveNotifyBtn.onclick = () => withBusy(async () => {
+      const payload = {
+        owner_id: state.session.user.id,
+        email: document.getElementById('input-notify-email').value.trim(),
+        phone: document.getElementById('input-notify-phone').value.trim(),
+        template: document.getElementById('input-notify-template').value.trim() || DEFAULT_ALERT_TEMPLATE
+      };
+      const { error } = await supabase.from('notify_settings').upsert(payload, { onConflict: 'owner_id' });
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
+
+    const newTask = document.getElementById('btn-new-task');
+    if(newTask) newTask.onclick = () => {
+      const restrictEditorId = state.currentUser.type === 'editor' ? state.currentUser.id : null;
+      state.modal = { kind:'task', data:null, restrictEditorId };
+      render();
+    };
+    const newEditor = document.getElementById('btn-new-editor');
+    if(newEditor) newEditor.onclick = () => { state.modal = { kind:'editor', data:null }; render(); };
+    const newClient = document.getElementById('btn-new-client');
+    if(newClient) newClient.onclick = () => { state.modal = { kind:'client', data:null }; render(); };
+    document.querySelectorAll('[data-edit-editor]').forEach(btn=>{
+      btn.onclick = () => {
+        const e = state.editors.find(x=>x.id===btn.getAttribute('data-edit-editor'));
+        state.modal = { kind:'editor', data: e };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-edit-client]').forEach(btn=>{
+      btn.onclick = () => {
+        const c = state.clients.find(x=>x.id===btn.getAttribute('data-edit-client'));
+        state.modal = { kind:'client', data: c };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-assign-status]').forEach(btn=>{
+      btn.onclick = () => {
+        const c = state.clients.find(x=>x.id===btn.getAttribute('data-assign-status'));
+        state.modal = { kind:'assign-status', data: c };
+        render();
+      };
+    });
+    const importClients = document.getElementById('btn-import-clients');
+    if(importClients) importClients.onclick = () => { state.modal = { kind:'import-clients' }; render(); };
+
+    document.querySelectorAll('[data-edit-task]').forEach(btn=>{
+      btn.onclick = () => {
+        const t = state.tasks.find(x=>x.id===btn.getAttribute('data-edit-task'));
+        const restrictEditorId = state.currentUser.type === 'editor' ? state.currentUser.id : null;
+        state.modal = { kind:'task', data: t, restrictEditorId };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-duplicate-task]').forEach(btn=>{
+      btn.onclick = () => {
+        const t = state.tasks.find(x=>x.id===btn.getAttribute('data-duplicate-task'));
+        if(!t) return;
+        const restrictEditorId = state.currentUser.type === 'editor' ? state.currentUser.id : null;
+        const seed = { ...t, videosDone: 0, paid: false, rawLink: '', editedLink: '' };
+        state.modal = { kind:'task', data: null, restrictEditorId, seed };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-toggle-paid]').forEach(btn=>{
+      btn.onclick = () => withBusy(async () => {
+        const t = state.tasks.find(x=>x.id===btn.getAttribute('data-toggle-paid'));
+        if(!t) return;
+        const { error } = await supabase.from('tasks').update({ paid: !t.paid }).eq('id', t.id);
+        if(error) throw error;
+        await reloadData();
+        render();
+      });
+    });
+    document.querySelectorAll('[data-delete-task]').forEach(btn=>{
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-delete-task');
+        askConfirm('¿Eliminar esta tarea?', () => withBusy(async () => {
+          const { error } = await supabase.from('tasks').delete().eq('id', id);
+          if(error) throw error;
+          await reloadData();
+          render();
+        }));
+      };
+    });
+    document.querySelectorAll('[data-delete-editor]').forEach(btn=>{
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-delete-editor');
+        askConfirm('¿Eliminar este editor? Las tareas asignadas quedarán sin asignar.', () => withBusy(async () => {
+          const { error } = await supabase.from('editors').delete().eq('id', id);
+          if(error) throw error;
+          await reloadData();
+          render();
+        }));
+      };
+    });
+    document.querySelectorAll('[data-delete-client]').forEach(btn=>{
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-delete-client');
+        askConfirm('¿Eliminar este cliente? Las tareas asociadas quedarán sin cliente.', () => withBusy(async () => {
+          const { error } = await supabase.from('clients').delete().eq('id', id);
+          if(error) throw error;
+          await reloadData();
+          render();
+        }));
+      };
+    });
+
+    document.querySelectorAll('[data-progress-id]').forEach(input=>{
+      input.oninput = () => {
+        const t = state.tasks.find(x=>x.id===input.getAttribute('data-progress-id'));
+        if(t){ t.videosDone = Number(input.value); const label = input.parentElement.querySelector('.mono'); if(label) label.textContent = `${t.videosDone}/${t.videoCount}`; }
+      };
+      input.onchange = () => withBusy(async () => {
+        const t = state.tasks.find(x=>x.id===input.getAttribute('data-progress-id'));
+        if(!t) return;
+        const { error } = await supabase.from('tasks').update({ videos_done: t.videosDone }).eq('id', t.id);
+        if(error) throw error;
+        await reloadData();
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-link-id]').forEach(input=>{
+      input.onblur = () => withBusy(async () => {
+        const t = state.tasks.find(x=>x.id===input.getAttribute('data-link-id'));
+        const type = input.getAttribute('data-link-type');
+        if(!t) return;
+        const value = input.value.trim();
+        const column = type === 'rawLink' ? 'raw_link' : 'edited_link';
+        const { error } = await supabase.from('tasks').update({ [column]: value }).eq('id', t.id);
+        if(error) throw error;
+        await reloadData();
+        render();
+      });
+    });
+  }
+
+  function askConfirm(message, onConfirm){
+    state.modal = { kind:'confirm', message, onConfirm };
+    render();
+  }
+
+  function renderModal(){
+    const m = state.modal;
+    if(!m) return '<div></div>';
+    if(m.kind === 'editor') return renderEditorModal(m.data);
+    if(m.kind === 'client') return renderClientModal(m.data);
+    if(m.kind === 'task') return renderTaskModal(m.data, m.restrictEditorId, m.seed);
+    if(m.kind === 'confirm') return renderConfirmModal(m.message);
+    if(m.kind === 'import-clients') return renderImportClientsModal();
+    if(m.kind === 'import-backup') return renderImportBackupModal();
+    if(m.kind === 'assign-status') return renderAssignStatusModal(m.data);
+    return '<div></div>';
+  }
+
+  function renderAssignStatusModal(client){
+    const options = CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${client&&client.status===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:400px;">
+      <h3>Estado de ${escapeHtml(client ? client.name : 'cliente')}</h3>
+      <div class="field">
+        <label class="field-label">Estado</label>
+        <select id="input-assign-status"><option value="">Sin estado</option>${options}</select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
+        <button class="btn btn-primary" id="btn-assign-status-submit">Guardar</button>
+      </div>
+    </div></div>`;
+  }
+
+  function renderConfirmModal(message){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:400px;">
+      <h3>Confirmar</h3>
+      <p style="margin:0 0 8px;color:var(--ink-soft);font-size:14px;line-height:1.55;font-family:'Inter',sans-serif;">${escapeHtml(message)}</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
+        <button class="btn btn-primary" id="btn-confirm-yes">Eliminar</button>
+      </div>
+    </div></div>`;
+  }
+
+  function renderImportBackupModal(){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:520px;">
+      <h3>Importar backup (.json)</h3>
+      <p style="margin:0 0 16px;color:var(--ink-soft);font-size:13.5px;line-height:1.55;">
+        Subí el archivo que descargaste con "Exportar datos" del panel viejo (o de una exportación anterior de este mismo panel). Los editores y clientes se emparejan por nombre — si ya existen no se duplican, solo se completan datos que falten. Las tareas siempre se crean como nuevas.
+      </p>
+      <div class="field"><label class="field-label">Archivo</label><input type="file" accept="application/json" id="input-backup-file"></div>
+      <p class="field-hint">Los editores importados no van a tener email todavía (el export viejo no lo incluía) — para que puedan loguearse, editalos después y agregales el email.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
+        <button class="btn btn-primary" id="btn-import-backup-submit">Importar</button>
+      </div>
+    </div></div>`;
+  }
+
+  const SHEET_CLIENT_SEED = [
+    ['Marcos Razzetti','Activo'],['Incubadora - Rosana y Sergio','Activo'],['Juan Carlos Guaqueta','Activo'],
+    ['Teshi Michellin','Activo'],['Sergio Hernández','Activo'],['Matías Otta','Activo'],['NOVA','Activo'],
+    ['Felipe Navas','Activo'],['Adrian Santana','Activo'],['Kevin Waker','Activo'],['Panthera Group','Activo'],
+    ['Sebas Struck','Activo'],['Martín Muntaner - Pantera','Activo'],['Santiago Canción','Activo'],
+    ['Rosana Benazzi','Activo'],['Tatiana Mejia','Activo'],['Tamara Palma','Activo'],
+    ['David Otalora','Baja/Cancelado'],['Choco Hernandez','Baja/Cancelado'],['Washington Pillajo','Baja/Cancelado'],
+    ['Lorena Valdez','Baja/Cancelado'],['Henry Venegas','Baja/Cancelado'],['Nicolas Quinteros','Baja/Cancelado'],
+    ['Framily Marín','Baja/Cancelado'],['Marisol Ceja','Baja/Cancelado'],['Angela Aguirre','Baja/Cancelado'],
+    ['Roberto Pérez Rodríguez','Baja/Cancelado'],['Andres Coy','Baja/Cancelado'],['Sofia Arango','Baja/Cancelado'],
+    ['Santiago Antico','Baja/Cancelado'],['Crysthian Tapia','Baja/Cancelado'],['Hery Garofalo - Yasmin Yunes','Baja/Cancelado'],
+    ['Emiliano Correa','Baja/Cancelado'],['Barber','Baja/Cancelado'],['Marlen Gonzalez','Baja/Cancelado'],
+    ['Leslie Otalora','Baja/Cancelado'],['Esserit Encino','Baja/Cancelado'],['Miguel de Lucas','Baja/Cancelado'],
+    ['Aldo','Baja/Cancelado'],['Claudio Ordez','Baja/Cancelado'],['Rafael Horna','Baja/Cancelado'],
+    ['Emma Juarez Repre Nahuel','Baja/Cancelado'],['Ana Coral','Baja/Cancelado'],['Jeremias - Te paseo','Baja/Cancelado'],
+    ['Alex Berruezo Soler','Baja/Cancelado'],['Sofi Moyano','Baja/Cancelado'],['Iñaki','Baja/Cancelado'],
+    ['Martin','Baja/Cancelado'],['Javier Prieto','Baja/Cancelado'],['Daniel Bocanegra','Baja/Cancelado'],
+    ['Ricardo Marquez','Baja/Cancelado'],['Santiago Buteler','Baja/Cancelado'],['Emilia Marconi','Baja/Cancelado'],
+    ['Lucas Casalins','Baja/Cancelado'],['Vika Tkachenko - Hipnocoaching para Emprendedoras','Baja/Cancelado'],
+    ['Marco Carrillo','Baja/Cancelado'],['Luciano Perri','Baja/Cancelado'],['Andres Colmenares','Baja/Cancelado'],
+    ['Miguel Angel - Trafico de BH','Baja/Cancelado'],['SebasWealth','Baja/Cancelado'],['Luis Valdez','Baja/Cancelado'],
+    ['Alvaro Reyes','Baja/Cancelado'],['Daniela Serrano','Baja/Cancelado'],['Catalina López','Baja/Cancelado'],
+    ['Joel Nova Agency','Baja/Cancelado'],['Salome - CM Sofia','Baja/Cancelado'],['Verónica Rodríguez Hoyos','Baja/Cancelado'],
+    ['Santiago Carmona Gutiérrez','Baja/Cancelado'],['Roger Beltran','Baja/Cancelado'],['Juan José Suárez','Casi-Cerrado'],
+    ['Gastón Allievi - Grinplace','En Espera/Congelado'],['Marlon Marin','En Espera/Congelado'],['Lore Filmaker','En Espera/Congelado'],
+    ['Daniel Herrera - Felda','En Espera/Congelado'],['Claudia Morales','En Espera/Congelado'],['Gerardo Gaxiola','En Negociación'],
+    ['Guillaume Gaudeaux','En Negociación'],['Javier Carmona','En Seguimiento (Post-Servicio)'],['Jenn Navarez','En Seguimiento (Post-Servicio)'],
+    ['Mina Meneses','En Seguimiento (Post-Servicio)'],['Cris Plascencia','Hacer seguimiento'],['Maria Felipe','Hacer seguimiento'],
+    ['Naderith Cassino','Hacer seguimiento'],['Nicolas Diaz Garces - Import/NNicoma LLC','Hacer seguimiento'],
+    ['Edición | Erika Gen Digital','Hacer seguimiento'],['Miguel Sánchez','Hacer seguimiento'],['Adriana','Hacer seguimiento'],
+    ['Enrique Mackenzie','Hacer seguimiento'],['Mérida','Hacer seguimiento'],['Pao','Hacer seguimiento'],
+    ['Andres Ortega','Hacer seguimiento'],['Camila Heredia','Hacer seguimiento'],['Yasmin Yunes','Hacer seguimiento'],
+    ['Jose Carlos Chavez','Hacer seguimiento'],['Wolf','Hacer seguimiento'],['Miguel','Hacer seguimiento'],
+    ['World Coaching Corp','Hacer seguimiento'],['Mauricio Zabala','Hacer seguimiento'],['Sandy Herz','Hacer seguimiento']
   ];
-  new Chart(document.getElementById('chartMargenes'), {
-    type: 'bar',
-    data: {
-      labels: margenes.map(m => m.name),
-      datasets: [{
-        data: margenes.map(m => m.value),
-        backgroundColor: dataColors.c1,
-        borderRadius: 3,
-        maxBarThickness: 22,
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      scales: {
-        x: { grid: { color: gridColor }, ticks: { callback: (v) => v + '%' }, suggestedMax: 60 },
-        y: { grid: { display: false } }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: { ...tooltipBase, callbacks: {
-          label: (ctx) => ` Margen: ${ctx.parsed.x}%`
-        } }
-      }
-    }
-  });
 
-  // 3. Pago a editores (bar)
-  const editores = [
-    { name: 'Tomas', value: 1280 },
-    { name: 'Hernan', value: 860 },
-    { name: 'Ada', value: 180 },
-    { name: 'Janer', value: 30 },
-  ];
-  new Chart(document.getElementById('chartEditores'), {
-    type: 'bar',
-    data: {
-      labels: editores.map(e => e.name),
-      datasets: [{
-        data: editores.map(e => e.value),
-        backgroundColor: dataColors.c2,
-        borderRadius: 3,
-        maxBarThickness: 40,
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        x: { grid: { display: false } },
-        y: { grid: { color: gridColor }, ticks: { callback: (v) => '$' + v } }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: { ...tooltipBase, callbacks: {
-          label: (ctx) => ` Pago: $${ctx.parsed.y.toLocaleString('en-US')}`
-        } }
-      }
+  function renderImportClientsModal(){
+    const seedText = SHEET_CLIENT_SEED.map(pair => pair.join('\t')).join('\n');
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:560px;">
+      <h3>Importar clientes desde Sheets</h3>
+      <p style="margin:0 0 16px;color:var(--ink-soft);font-size:13.5px;line-height:1.55;">
+        Pegá acá tus clientes, uno por línea. Si copiás dos columnas de tu planilla (Nombre y Estado) y las pegás juntas, se completa el estado automáticamente — separalas con un tab, que es lo que queda al copiar directo de Sheets.
+        Ya te dejamos precargada tu base actual con sus estados. Si un cliente ya existe en el panel, se le actualiza el estado; si no existe, se crea.
+      </p>
+      <div class="field">
+        <label class="field-label">Nombre [tab] Estado — uno por línea</label>
+        <textarea id="input-import-clients" rows="10" style="font-family:'Inter',sans-serif; resize:vertical;">${escapeHtml(seedText)}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
+        <button class="btn btn-primary" id="btn-import-clients-submit">Importar</button>
+      </div>
+    </div></div>`;
+  }
+
+  function renderEditorModal(data){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <h3>${data ? 'Editar editor' : 'Nuevo editor'}</h3>
+      <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-editor-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Martina Gómez"></div>
+      <div class="field">
+        <label class="field-label">Email</label>
+        <input type="email" id="input-editor-email" value="${escapeHtml(data?data.email:'')}" placeholder="editor@ejemplo.com">
+        <p class="field-hint">Con este email va a poder iniciar sesión: le llega un código de 6 dígitos por correo, sin contraseña. Podés dejarlo vacío y cargarlo después.</p>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-editor">Guardar</button></div>
+    </div></div>`;
+  }
+  function renderClientModal(data){
+    const statusOptions = CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${data&&data.status===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <h3>${data ? 'Editar cliente' : 'Nuevo cliente'}</h3>
+      <div class="field"><label class="field-label">Nombre del cliente</label><input type="text" id="input-client-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Café Luna"></div>
+      <div class="field"><label class="field-label">Estado</label><select id="input-client-status"><option value="">Sin estado</option>${statusOptions}</select></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client">Guardar</button></div>
+    </div></div>`;
+  }
+  function renderTaskModal(data, restrictEditorId, seed){
+    const src = data || seed || null;
+    const editorOptions = state.editors.map(e=>`<option value="${e.id}" ${src&&src.editorId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('');
+    const editorFieldHtml = restrictEditorId ? `
+          <div class="field">
+            <label class="field-label">Editor asignado</label>
+            <input type="text" value="${escapeHtml(editorName(restrictEditorId))}" disabled style="opacity:0.65;">
+            <input type="hidden" id="input-task-editor" value="${restrictEditorId}">
+          </div>` : `
+          <div class="field">
+            <label class="field-label">Editor asignado</label>
+            <select id="input-task-editor"><option value="">Sin asignar</option>${editorOptions}</select>
+          </div>`;
+    const initialClientId = src ? (src.clientId || '') : '';
+    const initialClientName = initialClientId ? clientName(initialClientId) : '';
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <h3>${data ? 'Editar tarea' : (seed ? 'Duplicar tarea' : 'Nueva tarea')}</h3>
+      <div class="field"><label class="field-label">Nombre del proyecto</label><input type="text" id="input-task-project" value="${escapeHtml(src?src.project:'')}" placeholder="Ej: Reels agosto"></div>
+      <div class="field-row">
+        <div class="field" style="position:relative;">
+          <label class="field-label">Cliente</label>
+          <input type="text" id="input-task-client-search" placeholder="Buscar cliente..." autocomplete="off" value="${escapeHtml(initialClientName)}">
+          <input type="hidden" id="input-task-client" value="${escapeHtml(initialClientId)}">
+          <div id="client-suggestions" class="client-suggestions" style="display:none;"></div>
+        </div>
+        ${editorFieldHtml}
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Cantidad de videos</label><input type="number" min="0" id="input-task-count" value="${src?src.videoCount:1}"></div>
+        <div class="field"><label class="field-label">Prioridad</label>
+          <select id="input-task-priority">
+            <option value="alta" ${src&&src.priority==='alta'?'selected':''}>Alta</option>
+            <option value="media" ${(!src || !src.priority || src.priority==='media')?'selected':''}>Media</option>
+            <option value="baja" ${src&&src.priority==='baja'?'selected':''}>Baja</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Fecha de entrega</label><input type="date" id="input-task-deadline" value="${src?src.deadline||'':''}"></div>
+        <div class="field"><label class="field-label">Precio por video (a favor del editor)</label><input type="number" min="0" step="0.01" id="input-task-price" value="${src?src.pricePerVideo:0}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Videos completados</label><input type="number" min="0" id="input-task-done" value="${src?src.videosDone:0}"></div>
+        <div class="field">
+          <label class="field-label">Pago</label>
+          <label style="display:flex; align-items:center; gap:8px; padding:10px 0; font-size:13.5px;">
+            <input type="checkbox" id="input-task-paid" style="width:auto;" ${src&&src.paid?'checked':''}>
+            Ya está pagada
+          </label>
+        </div>
+      </div>
+      <div class="field"><label class="field-label">Link material crudo</label><input type="text" id="input-task-raw" value="${escapeHtml(src?src.rawLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Link material editado</label><input type="text" id="input-task-edited" value="${escapeHtml(src?src.editedLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Notas</label><textarea id="input-task-notes" rows="3" placeholder="Contexto, pedidos del cliente, aprobaciones pendientes...">${escapeHtml(src?src.notes||'':'')}</textarea></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-task">Guardar</button></div>
+    </div></div>`;
+  }
+
+  function closeModal(){ state.modal = null; render(); }
+
+  function attachModalEvents(){
+    const backdrop = document.getElementById('modal-backdrop');
+    if(backdrop) backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
+    const cancelBtn = document.getElementById('btn-cancel-modal');
+    if(cancelBtn) cancelBtn.onclick = closeModal;
+
+    const clientSearch = document.getElementById('input-task-client-search');
+    const clientHidden = document.getElementById('input-task-client');
+    const clientSuggestionsBox = document.getElementById('client-suggestions');
+    if(clientSearch && clientHidden && clientSuggestionsBox){
+      const renderSuggestions = (query) => {
+        const q = query.trim().toLowerCase();
+        const matches = q ? state.clients.filter(c=>c.name.toLowerCase().includes(q)).slice(0,15) : state.clients.slice(0,15);
+        if(matches.length === 0){ clientSuggestionsBox.style.display = 'none'; clientSuggestionsBox.innerHTML=''; return; }
+        clientSuggestionsBox.innerHTML = matches.map(c=>`<div class="client-suggestion-item" data-client-option="${c.id}">${escapeHtml(c.name)}</div>`).join('');
+        clientSuggestionsBox.style.display = 'block';
+        clientSuggestionsBox.querySelectorAll('[data-client-option]').forEach(item=>{
+          item.onmousedown = (e) => {
+            e.preventDefault();
+            const cid = item.getAttribute('data-client-option');
+            const c = state.clients.find(x=>x.id===cid);
+            clientHidden.value = cid;
+            clientSearch.value = c ? c.name : '';
+            clientSuggestionsBox.style.display = 'none';
+          };
+        });
+      };
+      clientSearch.addEventListener('focus', () => renderSuggestions(clientSearch.value));
+      clientSearch.addEventListener('input', () => { clientHidden.value = ''; renderSuggestions(clientSearch.value); });
+      clientSearch.addEventListener('blur', () => { setTimeout(()=>{ clientSuggestionsBox.style.display = 'none'; }, 120); });
     }
-  });
+
+    const confirmYesBtn = document.getElementById('btn-confirm-yes');
+    if(confirmYesBtn) confirmYesBtn.onclick = () => {
+      const cb = state.modal && state.modal.onConfirm;
+      state.modal = null;
+      if(cb) cb();
+    };
+
+    const saveEditorBtn = document.getElementById('btn-save-editor');
+    if(saveEditorBtn) saveEditorBtn.onclick = () => withBusy(async () => {
+      const name = document.getElementById('input-editor-name').value.trim();
+      if(!name) return;
+      const email = document.getElementById('input-editor-email').value.trim().toLowerCase();
+      const data = state.modal.data;
+      if(data){
+        const { error } = await supabase.from('editors').update({ name, email: email || null }).eq('id', data.id);
+        if(error) throw error;
+        if(email){
+          await supabase.from('profiles').update({ editor_id: data.id, role: 'editor' }).eq('email', email).is('editor_id', null);
+        }
+      } else {
+        const { data: inserted, error } = await supabase.from('editors').insert({ name, email: email || null }).select().single();
+        if(error) throw error;
+        if(email && inserted){
+          await supabase.from('profiles').update({ editor_id: inserted.id, role: 'editor' }).eq('email', email).is('editor_id', null);
+        }
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const saveClientBtn = document.getElementById('btn-save-client');
+    if(saveClientBtn) saveClientBtn.onclick = () => withBusy(async () => {
+      const name = document.getElementById('input-client-name').value.trim();
+      if(!name) return;
+      const status = document.getElementById('input-client-status').value;
+      const data = state.modal.data;
+      if(data){
+        const { error } = await supabase.from('clients').update({ name, status }).eq('id', data.id);
+        if(error) throw error;
+      } else {
+        const { error } = await supabase.from('clients').insert({ name, status });
+        if(error) throw error;
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const assignStatusSubmit = document.getElementById('btn-assign-status-submit');
+    if(assignStatusSubmit) assignStatusSubmit.onclick = () => withBusy(async () => {
+      const status = document.getElementById('input-assign-status').value;
+      const data = state.modal.data;
+      const { error } = await supabase.from('clients').update({ status }).eq('id', data.id);
+      if(error) throw error;
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const importClientsSubmit = document.getElementById('btn-import-clients-submit');
+    if(importClientsSubmit) importClientsSubmit.onclick = () => withBusy(async () => {
+      const raw = document.getElementById('input-import-clients').value;
+      const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+      for(const line of lines){
+        const parts = line.split('\t');
+        const name = (parts[0]||'').trim();
+        const status = (parts[1]||'').trim();
+        if(!name) continue;
+        const existing = state.clients.find(c=>c.name.toLowerCase()===name.toLowerCase());
+        if(existing){
+          if(status){ await supabase.from('clients').update({ status }).eq('id', existing.id); }
+        } else {
+          await supabase.from('clients').insert({ name, status });
+        }
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const importBackupSubmit = document.getElementById('btn-import-backup-submit');
+    if(importBackupSubmit) importBackupSubmit.onclick = () => withBusy(async () => {
+      const fileInput = document.getElementById('input-backup-file');
+      const file = fileInput.files && fileInput.files[0];
+      if(!file){ alert('Elegí un archivo .json primero.'); return; }
+      const text = await file.text();
+      let payload;
+      try{ payload = JSON.parse(text); }
+      catch(e){ throw new Error('El archivo no es un JSON válido.'); }
+
+      const oldEditors = Array.isArray(payload.editors) ? payload.editors : [];
+      const oldClients = Array.isArray(payload.clients) ? payload.clients : [];
+      const oldTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+
+      const editorIdMap = {};
+      for(const oe of oldEditors){
+        const existing = state.clients && state.editors.find(e=>e.name.toLowerCase()===String(oe.name||'').toLowerCase());
+        if(existing){ editorIdMap[oe.id] = existing.id; continue; }
+        const { data: inserted, error } = await supabase.from('editors')
+          .insert({ name: oe.name || 'Sin nombre', goal: Number(oe.goal)||0, tracker_link: oe.trackerLink || '' })
+          .select().single();
+        if(error) throw error;
+        editorIdMap[oe.id] = inserted.id;
+        state.editors.push(editorFromRow(inserted));
+      }
+
+      const clientIdMap = {};
+      for(const oc of oldClients){
+        const existing = state.clients.find(c=>c.name.toLowerCase()===String(oc.name||'').toLowerCase());
+        if(existing){ clientIdMap[oc.id] = existing.id; continue; }
+        const { data: inserted, error } = await supabase.from('clients')
+          .insert({ name: oc.name || 'Sin nombre', status: oc.status || '' })
+          .select().single();
+        if(error) throw error;
+        clientIdMap[oc.id] = inserted.id;
+        state.clients.push(clientFromRow(inserted));
+      }
+
+      let importedTasks = 0;
+      for(const ot of oldTasks){
+        const row = {
+          project: ot.project || 'Sin nombre',
+          client_id: clientIdMap[ot.clientId] || null,
+          editor_id: editorIdMap[ot.editorId] || null,
+          video_count: Number(ot.videoCount)||0,
+          videos_done: Number(ot.videosDone)||0,
+          priority: ot.priority || 'media',
+          deadline: ot.deadline || null,
+          price_per_video: Number(ot.pricePerVideo)||0,
+          paid: !!ot.paid,
+          raw_link: ot.rawLink || '',
+          edited_link: ot.editedLink || '',
+          notes: ot.notes || ''
+        };
+        const { error } = await supabase.from('tasks').insert(row);
+        if(error) throw error;
+        importedTasks++;
+      }
+
+      closeModal();
+      await reloadData();
+      render();
+      alert(`Importación completa: ${oldEditors.length} editores, ${oldClients.length} clientes y ${importedTasks} tareas procesadas.`);
+    });
+
+    const saveTaskBtn = document.getElementById('btn-save-task');
+    if(saveTaskBtn) saveTaskBtn.onclick = () => withBusy(async () => {
+      const project = document.getElementById('input-task-project').value.trim();
+      if(!project) return;
+      let clientId = document.getElementById('input-task-client').value;
+      if(!clientId){
+        const typedName = document.getElementById('input-task-client-search').value.trim().toLowerCase();
+        if(typedName){
+          const match = state.clients.find(c=>c.name.toLowerCase() === typedName);
+          if(match) clientId = match.id;
+        }
+      }
+      const payload = {
+        project,
+        clientId,
+        editorId: document.getElementById('input-task-editor').value,
+        videoCount: Number(document.getElementById('input-task-count').value) || 0,
+        priority: document.getElementById('input-task-priority').value || 'media',
+        deadline: document.getElementById('input-task-deadline').value,
+        pricePerVideo: Number(document.getElementById('input-task-price').value) || 0,
+        videosDone: Number(document.getElementById('input-task-done').value) || 0,
+        paid: document.getElementById('input-task-paid').checked,
+        rawLink: document.getElementById('input-task-raw').value.trim(),
+        editedLink: document.getElementById('input-task-edited').value.trim(),
+        notes: document.getElementById('input-task-notes').value.trim(),
+      };
+      if(payload.videosDone > payload.videoCount) payload.videosDone = payload.videoCount;
+      const data = state.modal.data;
+      const row = taskToRow(payload);
+      if(data){
+        const { error } = await supabase.from('tasks').update(row).eq('id', data.id);
+        if(error) throw error;
+      } else {
+        const { error } = await supabase.from('tasks').insert(row);
+        if(error) throw error;
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+  }
+
+  async function init(){
+    render(); // pantalla de carga
+    const { data: { session } } = await supabase.auth.getSession();
+    await handleSession(session);
+    supabase.auth.onAuthStateChange((_event, session) => { handleSession(session); });
+  }
+
+  init();
+})();
 </script>
-
 </body>
 </html>
