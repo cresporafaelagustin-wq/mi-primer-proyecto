@@ -240,6 +240,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .empty-state h3{ font-family:'Playfair Display', serif; font-weight:600; color:var(--ink); font-size:17px; margin-bottom:8px; }
 .empty-state p{ color:var(--ink-soft); font-size:13.5px; }
 
+.donut-wrap{ display:flex; align-items:center; gap:36px; flex-wrap:wrap; border:1px solid var(--ink); padding:26px 28px; margin-bottom:34px; }
+.donut-wrap svg{ flex-shrink:0; }
+.donut-legend{ display:flex; flex-direction:column; gap:12px; flex:1; min-width:230px; }
+.donut-legend-item{ display:flex; align-items:baseline; gap:10px; font-size:13.5px; }
+.donut-swatch{ width:11px; height:11px; background:var(--ink); flex-shrink:0; margin-top:2px; }
+.donut-legend-label{ flex:1; font-family:'Inter',sans-serif; }
+.donut-legend-value{ font-size:12px; color:var(--ink-soft); text-transform:none; letter-spacing:0; white-space:nowrap; }
+
 .setup-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--paper); }
 .setup-card{ width:100%; max-width:560px; border:1px solid var(--ink); padding:30px 32px; }
 .setup-card code{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:var(--paper-line); padding:2px 6px; }
@@ -1279,6 +1287,43 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     `;
   }
 
+  function renderMoneyDonut(segments){
+    const size = 180, strokeWidth = 26;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const opacities = [1, 0.72, 0.52, 0.34, 0.18];
+    const total = segments.reduce((s,x)=>s+Math.max(x.value,0),0);
+
+    let acc = 0;
+    const arcs = total <= 0 ? '' : segments.map((seg, i) => {
+      const fraction = Math.max(seg.value,0) / total;
+      if(fraction <= 0) return '';
+      const dash = fraction * circumference;
+      const gapLen = circumference - dash;
+      const dashOffset = -acc * circumference;
+      acc += fraction;
+      return `<circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="var(--ink)" stroke-opacity="${opacities[i % opacities.length]}" stroke-width="${strokeWidth}" stroke-dasharray="${dash.toFixed(2)} ${gapLen.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}" transform="rotate(-90 ${size/2} ${size/2})"></circle>`;
+    }).join('');
+
+    const legend = segments.map((seg,i) => {
+      const pct = total > 0 ? (Math.max(seg.value,0)/total*100) : 0;
+      return `<div class="donut-legend-item">
+        <span class="donut-swatch" style="opacity:${opacities[i % opacities.length]}"></span>
+        <span class="donut-legend-label">${escapeHtml(seg.label)}</span>
+        <span class="mono donut-legend-value">${fmtMoney(seg.value)} · ${pct.toFixed(0)}%</span>
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="donut-wrap">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+          <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="var(--paper-line)" stroke-width="${strokeWidth}"></circle>
+          ${arcs}
+        </svg>
+        <div class="donut-legend">${ total > 0 ? legend : '<p class="empty-note">Todavía no hay ingresos cargados para mostrar el reparto.</p>' }</div>
+      </div>`;
+  }
+
   function renderFinanzas(){
     const clients = state.clients;
     const totalIncome = clients.reduce((s,c)=>s+Number(c.totalIncome||0),0);
@@ -1345,15 +1390,20 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Ingresos totales</div><div class="stat-value">${fmtMoney(totalIncome)}</div></div>
-        <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(totalEditingCost)}</div></div>
-        <div class="stat-card"><div class="stat-label">Comisión referentes</div><div class="stat-value">${fmtMoney(totalReferrerCommission)}</div></div>
-        <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(totalGatewayFees)}</div></div>
-        <div class="stat-card"><div class="stat-label">Gastos fijos</div><div class="stat-value">${fmtMoney(totalFixedExpenses)}</div></div>
         <div class="stat-card"><div class="stat-label">Total a guardar</div><div class="stat-value">${fmtMoney(totalToHold)}</div></div>
         <div class="stat-card"><div class="stat-label">Ganancia líquida</div><div class="stat-value">${fmtMoney(netProfit)}</div></div>
         <div class="stat-card"><div class="stat-label">Tu parte (${ownerPct}%)</div><div class="stat-value">${fmtMoney(ownerShare)}</div></div>
         <div class="stat-card"><div class="stat-label">Fondo de reserva</div><div class="stat-value">${fmtMoney(reserveShare)}</div></div>
       </div>
+
+      <div class="section-head"><div><span class="section-tag">Reparto</span><h2 class="section-title">¿En qué se va la plata?</h2></div></div>
+      ${ renderMoneyDonut([
+        { label: 'Ganancia líquida', value: Math.max(netProfit,0) },
+        { label: 'Costo edición', value: totalEditingCost },
+        { label: 'Comisión referentes', value: totalReferrerCommission },
+        { label: 'Gastos fijos', value: totalFixedExpenses },
+        { label: 'Comisión pasarela', value: totalGatewayFees }
+      ]) }
 
       <div class="section-head"><div><span class="section-tag">Cuentas</span><h2 class="section-title">Cuentas y plataformas</h2></div><button class="btn btn-primary btn-sm" id="btn-new-account">+ Nueva cuenta</button></div>
       ${ state.paymentAccounts.length===0 ? emptyState('Todavía no hay cuentas cargadas', 'Agregá tus cuentas o plataformas de pago (banco, exchange, etc.) para referenciarlas en clientes, editores, referentes y gastos.') : `<div class="manage-list" style="margin-bottom:34px;">${accountRows}</div>` }
