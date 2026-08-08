@@ -20,13 +20,24 @@ create extension if not exists pgcrypto;
 -- TABLAS
 -- ============================================================
 
+-- Cuentas/plataformas de pago (ARQ, BBVA, Binance, etc.). El saldo es un
+-- dato manual que el administrador actualiza a mano — no se calcula solo.
+create table if not exists public.payment_accounts (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  balance    numeric not null default 0,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.editors (
-  id           uuid primary key default gen_random_uuid(),
-  name         text not null,
-  email        text unique,
-  goal         numeric not null default 0,
-  tracker_link text not null default '',
-  created_at   timestamptz not null default now()
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null,
+  email             text unique,
+  goal              numeric not null default 0,
+  tracker_link      text not null default '',
+  payout_account_id uuid references public.payment_accounts(id) on delete set null,
+  created_at        timestamptz not null default now()
 );
 
 create table if not exists public.clients (
@@ -54,6 +65,34 @@ create table if not exists public.client_contracts (
   updated_at    timestamptz not null default now()
 );
 
+create table if not exists public.referrers (
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null,
+  payout_account_id uuid references public.payment_accounts(id) on delete set null,
+  created_at        timestamptz not null default now()
+);
+
+create table if not exists public.fixed_expenses (
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null,
+  cost              numeric not null default 0,
+  payout_account_id uuid references public.payment_accounts(id) on delete set null,
+  created_at        timestamptz not null default now()
+);
+
+-- Datos financieros por cliente: aparte de clients por el mismo motivo
+-- que client_contracts (ocultarlo de editores a nivel de base de datos).
+create table if not exists public.client_finance (
+  client_id                uuid primary key references public.clients(id) on delete cascade,
+  total_income             numeric not null default 0,
+  gateway_fee              numeric not null default 0,
+  referrer_id              uuid references public.referrers(id) on delete set null,
+  referrer_commission_pct  numeric not null default 0,
+  referrer_paid            boolean not null default false,
+  payment_account_id       uuid references public.payment_accounts(id) on delete set null,
+  updated_at               timestamptz not null default now()
+);
+
 create table if not exists public.tasks (
   id              uuid primary key default gen_random_uuid(),
   project         text not null,
@@ -78,6 +117,13 @@ create table if not exists public.notify_settings (
   phone      text not null default '',
   template   text not null default '',
   updated_at timestamptz not null default now()
+);
+
+-- Reparto de ganancias (ej: 70% para el admin, 30% a fondo de reserva).
+create table if not exists public.finance_settings (
+  owner_id        uuid primary key references auth.users(id) on delete cascade,
+  owner_share_pct numeric not null default 70,
+  updated_at      timestamptz not null default now()
 );
 
 -- Emails que se promueven a admin automáticamente al loguearse por primera vez.
@@ -164,6 +210,11 @@ $$;
 alter table public.editors enable row level security;
 alter table public.clients enable row level security;
 alter table public.client_contracts enable row level security;
+alter table public.payment_accounts enable row level security;
+alter table public.referrers enable row level security;
+alter table public.fixed_expenses enable row level security;
+alter table public.client_finance enable row level security;
+alter table public.finance_settings enable row level security;
 alter table public.tasks enable row level security;
 alter table public.notify_settings enable row level security;
 alter table public.admin_emails enable row level security;
@@ -223,6 +274,30 @@ create policy "editor delete own tasks" on public.tasks
 -- notify_settings: cada admin ve y edita solo su propia configuración.
 drop policy if exists "owner manage notify settings" on public.notify_settings;
 create policy "owner manage notify settings" on public.notify_settings
+  for all using (owner_id = auth.uid() and public.current_role() = 'admin')
+  with check (owner_id = auth.uid() and public.current_role() = 'admin');
+
+-- Módulo financiero: admin-only, sin ninguna policy de lectura para
+-- editores. Ni ingresos, ni comisiones, ni saldos, ni el reparto de
+-- ganancias son visibles para un editor bajo ningún concepto.
+drop policy if exists "admin only payment_accounts" on public.payment_accounts;
+create policy "admin only payment_accounts" on public.payment_accounts
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "admin only referrers" on public.referrers;
+create policy "admin only referrers" on public.referrers
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "admin only fixed_expenses" on public.fixed_expenses;
+create policy "admin only fixed_expenses" on public.fixed_expenses
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "admin only client_finance" on public.client_finance;
+create policy "admin only client_finance" on public.client_finance
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "owner manage finance_settings" on public.finance_settings;
+create policy "owner manage finance_settings" on public.finance_settings
   for all using (owner_id = auth.uid() and public.current_role() = 'admin')
   with check (owner_id = auth.uid() and public.current_role() = 'admin');
 

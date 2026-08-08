@@ -285,6 +285,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     editors: [],
     clients: [],
     tasks: [],
+    referrers: [],
+    paymentAccounts: [],
+    fixedExpenses: [],
+    financeSettings: { ownerSharePct: 70 },
     notifySettings: { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE },
     currentUser: null,
     login: { step: 'request', email: '', code: '', error: '', loading: false },
@@ -331,7 +335,26 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   /* ================= MAPPERS: fila de la base <-> objeto de la UI ================= */
   function editorFromRow(r){
-    return { id: r.id, name: r.name, email: r.email || '', goal: Number(r.goal)||0, trackerLink: r.tracker_link || '' };
+    return {
+      id: r.id, name: r.name, email: r.email || '', goal: Number(r.goal)||0,
+      trackerLink: r.tracker_link || '', payoutAccountId: r.payout_account_id || ''
+    };
+  }
+  function paymentAccountFromRow(r){
+    return { id: r.id, name: r.name, balance: Number(r.balance)||0 };
+  }
+  function referrerFromRow(r){
+    return { id: r.id, name: r.name, payoutAccountId: r.payout_account_id || '' };
+  }
+  function fixedExpenseFromRow(r){
+    return { id: r.id, name: r.name, cost: Number(r.cost)||0, payoutAccountId: r.payout_account_id || '' };
+  }
+  function clientFinanceFromRow(r){
+    return {
+      totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
+      referrerId: r.referrer_id || '', referrerCommissionPct: Number(r.referrer_commission_pct)||0,
+      referrerPaid: !!r.referrer_paid, paymentAccountId: r.payment_account_id || ''
+    };
   }
   function clientFromRow(r){
     return {
@@ -340,7 +363,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       instagramLink: r.instagram_link || '', driveLink: r.drive_link || '',
       trackerLink: r.tracker_link || '', referenceLink: r.reference_link || '',
       brandManualLink: r.brand_manual_link || '',
-      contractLink: '' // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
+      contractLink: '', // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
+      totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
+      referrerPaid: false, paymentAccountId: '' // ídem: vienen de client_finance, solo para admin
     };
   }
   function taskFromRow(r){
@@ -371,16 +396,38 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     state.tasks = (tasksRes.data || []).map(taskFromRow);
 
     if(state.currentUser && state.currentUser.type === 'admin' && state.session){
-      const [ns, contracts] = await Promise.all([
+      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes] = await Promise.all([
         supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
-        supabase.from('client_contracts').select('*')
+        supabase.from('client_contracts').select('*'),
+        supabase.from('payment_accounts').select('*').order('name'),
+        supabase.from('referrers').select('*').order('name'),
+        supabase.from('fixed_expenses').select('*').order('name'),
+        supabase.from('client_finance').select('*'),
+        supabase.from('finance_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle()
       ]);
       state.notifySettings = ns.data
         ? { email: ns.data.email || '', phone: ns.data.phone || '', template: ns.data.template || DEFAULT_ALERT_TEMPLATE }
         : { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE };
       const contractByClientId = {};
       (contracts.data || []).forEach(row => { contractByClientId[row.client_id] = row.contract_link || ''; });
-      state.clients.forEach(c => { c.contractLink = contractByClientId[c.id] || ''; });
+
+      state.paymentAccounts = (accountsRes.data || []).map(paymentAccountFromRow);
+      state.referrers = (referrersRes.data || []).map(referrerFromRow);
+      state.fixedExpenses = (expensesRes.data || []).map(fixedExpenseFromRow);
+
+      const financeByClientId = {};
+      (financeRes.data || []).forEach(row => { financeByClientId[row.client_id] = clientFinanceFromRow(row); });
+      state.clients.forEach(c => {
+        c.contractLink = contractByClientId[c.id] || '';
+        Object.assign(c, financeByClientId[c.id] || {
+          totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
+          referrerPaid: false, paymentAccountId: ''
+        });
+      });
+
+      state.financeSettings = fsRes.data
+        ? { ownerSharePct: Number(fsRes.data.owner_share_pct) || 70 }
+        : { ownerSharePct: 70 };
     }
   }
 
@@ -482,6 +529,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
   function editorName(id){ const e = state.editors.find(x=>x.id===id); return e ? e.name : 'Sin asignar'; }
   function clientName(id){ const c = state.clients.find(x=>x.id===id); return c ? c.name : 'Sin cliente'; }
+  function paymentAccountName(id){ const a = state.paymentAccounts.find(x=>x.id===id); return a ? a.name : ''; }
+  function accountOptionsHtml(selectedId){
+    return `<option value="">Sin cuenta</option>${state.paymentAccounts.map(a=>`<option value="${a.id}" ${selectedId===a.id?'selected':''}>${escapeHtml(a.name)}</option>`).join('')}`;
+  }
+  function referrerName(id){ const r = state.referrers.find(x=>x.id===id); return r ? r.name : 'Sin referente'; }
+  function clientEditingCost(clientId){
+    return state.tasks.filter(t=>t.clientId===clientId).reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+  }
+  function clientReferrerCommissionAmount(client){
+    return Number(client.totalIncome||0) * Number(client.referrerCommissionPct||0) / 100;
+  }
+  function clientRetained(client){
+    return clientEditingCost(client.id) + Number(client.gatewayFee||0) + clientReferrerCommissionAmount(client);
+  }
+  function clientNetProfit(client){
+    return Number(client.totalIncome||0) - clientRetained(client);
+  }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function render(){
@@ -589,7 +653,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderShell(){
     const isAdmin = state.currentUser.type === 'admin';
     const userLabel = isAdmin ? 'Administrador' : editorName(state.currentUser.id);
-    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes']];
+    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
     const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mis-proyecciones','Mis proyecciones']];
     const tabs = isAdmin ? adminTabs : editorTabs;
     const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${label}</button>`).join('');
@@ -708,6 +772,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(state.activeTab === 'alertas') return renderAlertas();
     if(state.activeTab === 'editores') return renderEditoresManage();
     if(state.activeTab === 'clientes') return renderClientesManage();
+    if(state.activeTab === 'finanzas') return renderFinanzas();
     return '';
   }
   function renderEditorTab(){
@@ -1188,11 +1253,122 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </div>
       </div>
 
+      ${ isAdmin ? `
+      <div class="section-head"><div><span class="section-tag">Solo admin</span><h2 class="section-title">Finanzas</h2></div><button class="btn btn-ghost btn-sm" data-edit-client-finance="${client.id}">Editar finanzas</button></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Ingreso total</div><div class="stat-value">${fmtMoney(client.totalIncome)}</div></div>
+        <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(clientEditingCost(client.id))}</div></div>
+        <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(client.gatewayFee)}</div></div>
+        <div class="stat-card"><div class="stat-label">Comisión referido</div><div class="stat-value">${fmtMoney(clientReferrerCommissionAmount(client))}</div></div>
+        <div class="stat-card"><div class="stat-label">Ganancia neta</div><div class="stat-value">${fmtMoney(clientNetProfit(client))}</div></div>
+      </div>
+      <div class="goal-box" style="margin-bottom:34px;">
+        <div class="task-meta">
+          <span>Cobrado en <span class="mono">${client.paymentAccountId ? escapeHtml(paymentAccountName(client.paymentAccountId)) : 'sin cuenta asignada'}</span></span>
+          <span>Referente <span class="mono">${client.referrerId ? escapeHtml(referrerName(client.referrerId)) + ' (' + Number(client.referrerCommissionPct||0) + '%)' : 'sin referente'}</span></span>
+          ${ client.referrerId ? `<span>Comisión referido <span class="mono">${client.referrerPaid ? 'pagada' : 'pendiente'}</span></span>` : '' }
+        </div>
+      </div>` : '' }
+
       <div class="section-head"><div><span class="section-tag">Historial</span><h2 class="section-title">Tareas de este cliente</h2></div></div>
       ${ clientTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se cree una tarea para este cliente, va a aparecer acá.') : `
       <table class="data-table">
         <thead><tr><th>Proyecto</th><th>Editor</th><th>Estado</th><th>Entrega</th></tr></thead>
         <tbody>${taskRows}</tbody>
+      </table>` }
+    `;
+  }
+
+  function renderFinanzas(){
+    const clients = state.clients;
+    const totalIncome = clients.reduce((s,c)=>s+Number(c.totalIncome||0),0);
+    const totalEditingCost = state.tasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const totalReferrerCommission = clients.reduce((s,c)=>s+clientReferrerCommissionAmount(c),0);
+    const totalGatewayFees = clients.reduce((s,c)=>s+Number(c.gatewayFee||0),0);
+    const totalFixedExpenses = state.fixedExpenses.reduce((s,e)=>s+Number(e.cost||0),0);
+    const totalToHold = totalEditingCost + totalReferrerCommission + totalGatewayFees + totalFixedExpenses;
+    const netProfit = totalIncome - totalToHold;
+    const ownerPct = Number(state.financeSettings.ownerSharePct)||0;
+    const ownerShare = netProfit * ownerPct / 100;
+    const reserveShare = netProfit * (100 - ownerPct) / 100;
+
+    const accountRows = state.paymentAccounts.map(a=>`
+      <div class="manage-row">
+        <div><div class="name">${escapeHtml(a.name)}</div><div class="sub">Saldo ${fmtMoney(a.balance)}</div></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-edit-account="${a.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-account="${a.id}">Eliminar</button>
+        </div>
+      </div>`).join('');
+
+    const expenseRows = state.fixedExpenses.map(e=>`
+      <div class="manage-row">
+        <div><div class="name">${escapeHtml(e.name)}</div><div class="sub">${fmtMoney(e.cost)} · Sale de ${e.payoutAccountId ? escapeHtml(paymentAccountName(e.payoutAccountId)) : 'sin cuenta'}</div></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-edit-expense="${e.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-expense="${e.id}">Eliminar</button>
+        </div>
+      </div>`).join('');
+
+    const referrerRows = state.referrers.map(r=>{
+      const myClients = clients.filter(c=>c.referrerId===r.id);
+      const total = myClients.reduce((s,c)=>s+clientReferrerCommissionAmount(c),0);
+      const pending = myClients.filter(c=>!c.referrerPaid).reduce((s,c)=>s+clientReferrerCommissionAmount(c),0);
+      return `<div class="manage-row">
+        <div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${myClients.length} cliente${myClients.length===1?'':'s'} · Total ${fmtMoney(total)} · Pendiente ${fmtMoney(pending)} · Sale de ${r.payoutAccountId ? escapeHtml(paymentAccountName(r.payoutAccountId)) : 'sin cuenta'}</div></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-edit-referrer="${r.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-referrer="${r.id}">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const clientFinanceRows = clients.map(c=>`
+      <tr>
+        <td><button class="manage-row-name-btn" data-view-client="${c.id}">${escapeHtml(c.name)}</button></td>
+        <td class="mono">${fmtMoney(c.totalIncome)}</td>
+        <td class="mono">${fmtMoney(clientEditingCost(c.id))}</td>
+        <td class="mono">${fmtMoney(clientNetProfit(c))}</td>
+        <td>${c.paymentStatus ? escapeHtml(c.paymentStatus) : 'Sin estado'}</td>
+      </tr>`).join('');
+
+    return `
+      <div class="section-head"><div><span class="section-tag">06 — Finanzas</span><h2 class="section-title">Panel financiero</h2></div></div>
+
+      <div class="goal-box" style="margin-bottom:34px;">
+        <div class="field-row">
+          <div class="field"><label class="field-label">Tu parte de la ganancia (%)</label><input type="number" min="0" max="100" step="1" id="input-owner-share-pct" value="${ownerPct}"></div>
+          <div style="display:flex; align-items:flex-end;"><button class="btn btn-primary btn-sm" id="btn-save-owner-share" style="width:100%;">Guardar</button></div>
+        </div>
+        <p class="goal-message">El resto (${(100-ownerPct).toFixed(0)}%) queda como fondo de reserva de la empresa.</p>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Ingresos totales</div><div class="stat-value">${fmtMoney(totalIncome)}</div></div>
+        <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(totalEditingCost)}</div></div>
+        <div class="stat-card"><div class="stat-label">Comisión referentes</div><div class="stat-value">${fmtMoney(totalReferrerCommission)}</div></div>
+        <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(totalGatewayFees)}</div></div>
+        <div class="stat-card"><div class="stat-label">Gastos fijos</div><div class="stat-value">${fmtMoney(totalFixedExpenses)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total a guardar</div><div class="stat-value">${fmtMoney(totalToHold)}</div></div>
+        <div class="stat-card"><div class="stat-label">Ganancia líquida</div><div class="stat-value">${fmtMoney(netProfit)}</div></div>
+        <div class="stat-card"><div class="stat-label">Tu parte (${ownerPct}%)</div><div class="stat-value">${fmtMoney(ownerShare)}</div></div>
+        <div class="stat-card"><div class="stat-label">Fondo de reserva</div><div class="stat-value">${fmtMoney(reserveShare)}</div></div>
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">Cuentas</span><h2 class="section-title">Cuentas y plataformas</h2></div><button class="btn btn-primary btn-sm" id="btn-new-account">+ Nueva cuenta</button></div>
+      ${ state.paymentAccounts.length===0 ? emptyState('Todavía no hay cuentas cargadas', 'Agregá tus cuentas o plataformas de pago (banco, exchange, etc.) para referenciarlas en clientes, editores, referentes y gastos.') : `<div class="manage-list" style="margin-bottom:34px;">${accountRows}</div>` }
+
+      <div class="section-head"><div><span class="section-tag">Gastos</span><h2 class="section-title">Gastos fijos</h2></div><button class="btn btn-primary btn-sm" id="btn-new-expense">+ Nuevo gasto</button></div>
+      ${ state.fixedExpenses.length===0 ? emptyState('Todavía no hay gastos fijos cargados', 'Agregá tus herramientas/suscripciones (Adobe, Drive, etc.) y su costo mensual.') : `<div class="manage-list" style="margin-bottom:34px;">${expenseRows}</div>` }
+
+      <div class="section-head"><div><span class="section-tag">Referentes</span><h2 class="section-title">Referentes</h2></div><button class="btn btn-primary btn-sm" id="btn-new-referrer">+ Nuevo referente</button></div>
+      ${ state.referrers.length===0 ? emptyState('Todavía no hay referentes cargados', 'Agregá a las personas que te traen clientes y cobran comisión.') : `<div class="manage-list" style="margin-bottom:34px;">${referrerRows}</div>` }
+
+      <div class="section-head"><div><span class="section-tag">Por cliente</span><h2 class="section-title">Detalle financiero</h2></div></div>
+      ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Cuando cargues clientes, su información financiera va a aparecer acá.') : `
+      <table class="data-table">
+        <thead><tr><th>Cliente</th><th>Ingreso</th><th>Costo edición</th><th>Ganancia neta</th><th>Estado</th></tr></thead>
+        <tbody>${clientFinanceRows}</tbody>
       </table>` }
     `;
   }
@@ -1255,6 +1431,82 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(newEditor) newEditor.onclick = () => { state.modal = { kind:'editor', data:null }; render(); };
     const newClient = document.getElementById('btn-new-client');
     if(newClient) newClient.onclick = () => { state.modal = { kind:'client', data:null }; render(); };
+    const newAccount = document.getElementById('btn-new-account');
+    if(newAccount) newAccount.onclick = () => { state.modal = { kind:'account', data:null }; render(); };
+    const newExpense = document.getElementById('btn-new-expense');
+    if(newExpense) newExpense.onclick = () => { state.modal = { kind:'expense', data:null }; render(); };
+    const newReferrer = document.getElementById('btn-new-referrer');
+    if(newReferrer) newReferrer.onclick = () => { state.modal = { kind:'referrer', data:null }; render(); };
+    document.querySelectorAll('[data-edit-account]').forEach(btn=>{
+      btn.onclick = () => {
+        const a = state.paymentAccounts.find(x=>x.id===btn.getAttribute('data-edit-account'));
+        state.modal = { kind:'account', data: a };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-edit-expense]').forEach(btn=>{
+      btn.onclick = () => {
+        const e = state.fixedExpenses.find(x=>x.id===btn.getAttribute('data-edit-expense'));
+        state.modal = { kind:'expense', data: e };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-edit-referrer]').forEach(btn=>{
+      btn.onclick = () => {
+        const r = state.referrers.find(x=>x.id===btn.getAttribute('data-edit-referrer'));
+        state.modal = { kind:'referrer', data: r };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-edit-client-finance]').forEach(btn=>{
+      btn.onclick = () => {
+        const c = state.clients.find(x=>x.id===btn.getAttribute('data-edit-client-finance'));
+        state.modal = { kind:'client-finance', data: c };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-delete-account]').forEach(btn=>{
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-delete-account');
+        askConfirm('¿Eliminar esta cuenta? Los editores/referentes/gastos que la tenían asignada quedarán sin cuenta.', () => withBusy(async () => {
+          const { error } = await supabase.from('payment_accounts').delete().eq('id', id);
+          if(error) throw error;
+          await reloadData();
+          render();
+        }));
+      };
+    });
+    document.querySelectorAll('[data-delete-expense]').forEach(btn=>{
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-delete-expense');
+        askConfirm('¿Eliminar este gasto fijo?', () => withBusy(async () => {
+          const { error } = await supabase.from('fixed_expenses').delete().eq('id', id);
+          if(error) throw error;
+          await reloadData();
+          render();
+        }));
+      };
+    });
+    document.querySelectorAll('[data-delete-referrer]').forEach(btn=>{
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-delete-referrer');
+        askConfirm('¿Eliminar este referente? Los clientes que lo tenían asignado quedarán sin referente.', () => withBusy(async () => {
+          const { error } = await supabase.from('referrers').delete().eq('id', id);
+          if(error) throw error;
+          await reloadData();
+          render();
+        }));
+      };
+    });
+    const saveOwnerShareBtn = document.getElementById('btn-save-owner-share');
+    if(saveOwnerShareBtn) saveOwnerShareBtn.onclick = () => withBusy(async () => {
+      const pct = Number(document.getElementById('input-owner-share-pct').value) || 0;
+      const { error } = await supabase.from('finance_settings')
+        .upsert({ owner_id: state.session.user.id, owner_share_pct: pct }, { onConflict: 'owner_id' });
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
     document.querySelectorAll('[data-edit-editor]').forEach(btn=>{
       btn.onclick = () => {
         const e = state.editors.find(x=>x.id===btn.getAttribute('data-edit-editor'));
@@ -1391,7 +1643,67 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(m.kind === 'import-clients') return renderImportClientsModal();
     if(m.kind === 'import-backup') return renderImportBackupModal();
     if(m.kind === 'assign-status') return renderAssignStatusModal(m.data);
+    if(m.kind === 'account') return renderAccountModal(m.data);
+    if(m.kind === 'expense') return renderExpenseModal(m.data);
+    if(m.kind === 'referrer') return renderReferrerModal(m.data);
+    if(m.kind === 'client-finance') return renderClientFinanceModal(m.data);
     return '<div></div>';
+  }
+
+  function renderAccountModal(data){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:400px;">
+      <h3>${data ? 'Editar cuenta' : 'Nueva cuenta'}</h3>
+      <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-account-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: BBVA"></div>
+      <div class="field"><label class="field-label">Saldo actual ($)</label><input type="number" step="0.01" id="input-account-balance" value="${data && data.balance ? data.balance : ''}" placeholder="0"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-account">Guardar</button></div>
+    </div></div>`;
+  }
+
+  function renderExpenseModal(data){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+      <h3>${data ? 'Editar gasto fijo' : 'Nuevo gasto fijo'}</h3>
+      <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-expense-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Adobe Suite"></div>
+      <div class="field"><label class="field-label">Costo mensual ($)</label><input type="number" step="0.01" id="input-expense-cost" value="${data && data.cost ? data.cost : ''}" placeholder="0"></div>
+      <div class="field"><label class="field-label">Cuenta de salida</label><select id="input-expense-account">${accountOptionsHtml(data?data.payoutAccountId:'')}</select></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-expense">Guardar</button></div>
+    </div></div>`;
+  }
+
+  function renderReferrerModal(data){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+      <h3>${data ? 'Editar referente' : 'Nuevo referente'}</h3>
+      <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-referrer-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Francisco Rizzardo"></div>
+      <div class="field"><label class="field-label">Cuenta de salida</label><select id="input-referrer-account">${accountOptionsHtml(data?data.payoutAccountId:'')}</select></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-referrer">Guardar</button></div>
+    </div></div>`;
+  }
+
+  function renderClientFinanceModal(client){
+    const referrerOptions = state.referrers.map(r=>`<option value="${r.id}" ${client.referrerId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <h3>Finanzas de ${escapeHtml(client.name)}</h3>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Ingreso total cobrado ($)</label><input type="number" step="0.01" id="input-finance-income" value="${client.totalIncome || ''}" placeholder="0"></div>
+        <div class="field"><label class="field-label">Comisión pasarela ($)</label><input type="number" step="0.01" id="input-finance-gateway" value="${client.gatewayFee || ''}" placeholder="0"></div>
+      </div>
+      <div class="field"><label class="field-label">Cuenta donde se cobró</label><select id="input-finance-account">${accountOptionsHtml(client.paymentAccountId)}</select></div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Referente</label><select id="input-finance-referrer"><option value="">Sin referente</option>${referrerOptions}</select></div>
+        <div class="field"><label class="field-label">% Comisión referido</label><input type="number" min="0" max="100" step="0.1" id="input-finance-referrer-pct" value="${client.referrerCommissionPct || ''}" placeholder="0"></div>
+      </div>
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:8px; padding:10px 0; font-size:13.5px;">
+          <input type="checkbox" id="input-finance-referrer-paid" style="width:auto;" ${client.referrerPaid?'checked':''}>
+          Comisión de referido ya pagada
+        </label>
+      </div>
+      <p class="field-hint">El costo de edición se calcula solo, a partir de las tareas de este cliente — no hace falta cargarlo acá.</p>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client-finance">Guardar</button></div>
+    </div></div>`;
   }
 
   function renderAssignStatusModal(client){
@@ -1504,6 +1816,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <input type="email" id="input-editor-email" value="${escapeHtml(data?data.email:'')}" placeholder="editor@ejemplo.com">
         <p class="field-hint">Con este email va a poder iniciar sesión: le llega un código de 6 dígitos por correo, sin contraseña. Podés dejarlo vacío y cargarlo después.</p>
       </div>
+      <div class="field"><label class="field-label">Cuenta desde la que se le paga</label><select id="input-editor-account">${accountOptionsHtml(data?data.payoutAccountId:'')}</select></div>
       <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-editor">Guardar</button></div>
     </div></div>`;
   }
@@ -1640,15 +1953,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const name = document.getElementById('input-editor-name').value.trim();
       if(!name) return;
       const email = document.getElementById('input-editor-email').value.trim().toLowerCase();
+      const payoutAccountId = document.getElementById('input-editor-account').value || null;
       const data = state.modal.data;
       if(data){
-        const { error } = await supabase.from('editors').update({ name, email: email || null }).eq('id', data.id);
+        const { error } = await supabase.from('editors').update({ name, email: email || null, payout_account_id: payoutAccountId }).eq('id', data.id);
         if(error) throw error;
         if(email){
           await supabase.from('profiles').update({ editor_id: data.id, role: 'editor' }).eq('email', email).is('editor_id', null);
         }
       } else {
-        const { data: inserted, error } = await supabase.from('editors').insert({ name, email: email || null }).select().single();
+        const { data: inserted, error } = await supabase.from('editors').insert({ name, email: email || null, payout_account_id: payoutAccountId }).select().single();
         if(error) throw error;
         if(email && inserted){
           await supabase.from('profiles').update({ editor_id: inserted.id, role: 'editor' }).eq('email', email).is('editor_id', null);
@@ -1688,6 +2002,86 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const { error: contractError } = await supabase.from('client_contracts')
         .upsert({ client_id: clientId, contract_link: contractLink }, { onConflict: 'client_id' });
       if(contractError) throw contractError;
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const saveAccountBtn = document.getElementById('btn-save-account');
+    if(saveAccountBtn) saveAccountBtn.onclick = () => withBusy(async () => {
+      const name = document.getElementById('input-account-name').value.trim();
+      if(!name) return;
+      const payload = { name, balance: Number(document.getElementById('input-account-balance').value) || 0 };
+      const data = state.modal.data;
+      if(data){
+        const { error } = await supabase.from('payment_accounts').update(payload).eq('id', data.id);
+        if(error) throw error;
+      } else {
+        const { error } = await supabase.from('payment_accounts').insert(payload);
+        if(error) throw error;
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const saveExpenseBtn = document.getElementById('btn-save-expense');
+    if(saveExpenseBtn) saveExpenseBtn.onclick = () => withBusy(async () => {
+      const name = document.getElementById('input-expense-name').value.trim();
+      if(!name) return;
+      const payload = {
+        name,
+        cost: Number(document.getElementById('input-expense-cost').value) || 0,
+        payout_account_id: document.getElementById('input-expense-account').value || null,
+      };
+      const data = state.modal.data;
+      if(data){
+        const { error } = await supabase.from('fixed_expenses').update(payload).eq('id', data.id);
+        if(error) throw error;
+      } else {
+        const { error } = await supabase.from('fixed_expenses').insert(payload);
+        if(error) throw error;
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const saveReferrerBtn = document.getElementById('btn-save-referrer');
+    if(saveReferrerBtn) saveReferrerBtn.onclick = () => withBusy(async () => {
+      const name = document.getElementById('input-referrer-name').value.trim();
+      if(!name) return;
+      const payload = {
+        name,
+        payout_account_id: document.getElementById('input-referrer-account').value || null,
+      };
+      const data = state.modal.data;
+      if(data){
+        const { error } = await supabase.from('referrers').update(payload).eq('id', data.id);
+        if(error) throw error;
+      } else {
+        const { error } = await supabase.from('referrers').insert(payload);
+        if(error) throw error;
+      }
+      closeModal();
+      await reloadData();
+      render();
+    });
+
+    const saveClientFinanceBtn = document.getElementById('btn-save-client-finance');
+    if(saveClientFinanceBtn) saveClientFinanceBtn.onclick = () => withBusy(async () => {
+      const client = state.modal.data;
+      const payload = {
+        client_id: client.id,
+        total_income: Number(document.getElementById('input-finance-income').value) || 0,
+        gateway_fee: Number(document.getElementById('input-finance-gateway').value) || 0,
+        payment_account_id: document.getElementById('input-finance-account').value || null,
+        referrer_id: document.getElementById('input-finance-referrer').value || null,
+        referrer_commission_pct: Number(document.getElementById('input-finance-referrer-pct').value) || 0,
+        referrer_paid: document.getElementById('input-finance-referrer-paid').checked,
+      };
+      const { error } = await supabase.from('client_finance').upsert(payload, { onConflict: 'client_id' });
+      if(error) throw error;
       closeModal();
       await reloadData();
       render();
