@@ -232,6 +232,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .manage-list{ display:flex; flex-direction:column; gap:1px; background:var(--paper-line); border:1px solid var(--paper-line); }
 .manage-row{ display:flex; align-items:center; justify-content:space-between; background:var(--paper); padding:15px 18px; gap:12px; flex-wrap:wrap; }
 .manage-row .name{ font-family:'Playfair Display', serif; font-weight:600; font-size:15.5px; }
+.manage-row-name-btn{ background:none; border:none; padding:0; margin:0; font-family:'Playfair Display', serif; font-weight:600; font-size:15.5px; color:var(--ink); cursor:pointer; text-align:left; }
+.manage-row-name-btn:hover{ text-decoration:underline; }
 .manage-row .sub{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-top:4px; }
 
 .empty-state{ text-align:center; padding:60px 20px; border:1px dashed var(--paper-line); }
@@ -273,6 +275,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   const DEFAULT_ALERT_TEMPLATE = 'Atención: la tarea "{proyecto}" del cliente {cliente}, asignada a {editor}, está atrasada por {dias} día(s). Entrega prevista: {entrega}.';
 
   const CLIENT_STATUSES = ['Activo','Baja/Cancelado','Casi-Cerrado','En Espera/Congelado','En Negociación','En Seguimiento (Post-Servicio)','Hacer seguimiento'];
+  const CLIENT_PAYMENT_STATUSES = ['Al día','Debe','No paga'];
 
   let state = {
     ready: false,
@@ -287,6 +290,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     login: { step: 'request', email: '', code: '', error: '', loading: false },
     activeTab: 'resumen',
     filter: { editorId:'', clientId:'', status:'', priority:'', clientStatus:'', month:'' },
+    clientDetailId: null,
     modal: null
   };
 
@@ -330,7 +334,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return { id: r.id, name: r.name, email: r.email || '', goal: Number(r.goal)||0, trackerLink: r.tracker_link || '' };
   }
   function clientFromRow(r){
-    return { id: r.id, name: r.name, status: r.status || '' };
+    return {
+      id: r.id, name: r.name, status: r.status || '',
+      paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0,
+      instagramLink: r.instagram_link || '', driveLink: r.drive_link || '',
+      trackerLink: r.tracker_link || '', contractLink: r.contract_link || ''
+    };
   }
   function taskFromRow(r){
     return {
@@ -1073,6 +1082,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderClientesManage(){
+    if(state.clientDetailId){
+      const detailClient = state.clients.find(c=>c.id===state.clientDetailId);
+      if(detailClient) return renderClientProfile(detailClient);
+    }
+
     let clients = state.clients.slice();
     if(state.filter.clientStatus) clients = clients.filter(c => (c.status||'') === state.filter.clientStatus);
 
@@ -1080,7 +1094,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const n = state.tasks.filter(t=>t.clientId===c.id).length;
       return `<div class="manage-row">
         <div>
-          <div class="name">${escapeHtml(c.name)}</div>
+          <button class="manage-row-name-btn" data-view-client="${c.id}">${escapeHtml(c.name)}</button>
           <div class="sub">${n} tarea${n===1?'':'s'} asociada${n===1?'':'s'}</div>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
@@ -1109,6 +1123,61 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
       ${ state.clients.length > 0 ? statusFilter : '' }
       ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Agregá tu primer cliente o importalos desde tu planilla de Sheets.') : `<div class="manage-list">${rows}</div>` }
+    `;
+  }
+
+  function renderClientProfile(client){
+    const clientTasks = state.tasks.filter(t=>t.clientId===client.id);
+
+    const linkRow = (label, url) => `
+      <div class="link-row">
+        <span class="field-label-inline">${escapeHtml(label)}</span>
+        ${ url ? `<a class="open-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : `<span style="color:var(--ink-soft); font-size:12.5px;">Sin cargar</span>` }
+      </div>`;
+
+    const taskRows = clientTasks.map(t=>`
+      <tr>
+        <td>${escapeHtml(t.project)}</td>
+        <td>${escapeHtml(editorName(t.editorId))}</td>
+        <td>${statusLabel(taskStatus(t))}</td>
+        <td class="mono">${fmtDate(t.deadline)}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <button class="btn btn-ghost btn-sm" id="btn-back-to-clients" style="margin-bottom:22px;">← Volver a clientes</button>
+
+      <div class="section-head">
+        <div><span class="section-tag">Ficha de cliente</span><h2 class="section-title">${escapeHtml(client.name)}</h2></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-edit-client="${client.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-client="${client.id}">Eliminar</button>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Estado</div><div class="stat-value" style="font-size:15px;">${client.status ? escapeHtml(client.status) : 'Sin estado'}</div></div>
+        <div class="stat-card"><div class="stat-label">Pago</div><div class="stat-value" style="font-size:15px;">${client.paymentStatus ? escapeHtml(client.paymentStatus) : 'Sin estado'}</div></div>
+        <div class="stat-card"><div class="stat-label">Debe</div><div class="stat-value">${fmtMoney(client.amountOwed)}</div></div>
+        <div class="stat-card"><div class="stat-label">Tareas asociadas</div><div class="stat-value">${clientTasks.length}</div></div>
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">Enlaces</span><h2 class="section-title">Perfiles y archivos</h2></div></div>
+      <div class="goal-box" style="margin-bottom:34px;">
+        <div class="task-links">
+          ${linkRow('Instagram', client.instagramLink)}
+          ${linkRow('Drive', client.driveLink)}
+          ${linkRow('Tracker', client.trackerLink)}
+          ${linkRow('Contrato', client.contractLink)}
+        </div>
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">Historial</span><h2 class="section-title">Tareas de este cliente</h2></div></div>
+      ${ clientTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se cree una tarea para este cliente, va a aparecer acá.') : `
+      <table class="data-table">
+        <thead><tr><th>Proyecto</th><th>Editor</th><th>Estado</th><th>Entrega</th></tr></thead>
+        <tbody>${taskRows}</tbody>
+      </table>` }
     `;
   }
 
@@ -1184,6 +1253,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         render();
       };
     });
+    document.querySelectorAll('[data-view-client]').forEach(btn=>{
+      btn.onclick = () => { state.clientDetailId = btn.getAttribute('data-view-client'); render(); };
+    });
+    const backToClientsBtn = document.getElementById('btn-back-to-clients');
+    if(backToClientsBtn) backToClientsBtn.onclick = () => { state.clientDetailId = null; render(); };
     document.querySelectorAll('[data-assign-status]').forEach(btn=>{
       btn.onclick = () => {
         const c = state.clients.find(x=>x.id===btn.getAttribute('data-assign-status'));
@@ -1419,11 +1493,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
   function renderClientModal(data){
     const statusOptions = CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${data&&data.status===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
+    const paymentOptions = CLIENT_PAYMENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${data&&data.paymentStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
       <h3>${data ? 'Editar cliente' : 'Nuevo cliente'}</h3>
       <div class="field"><label class="field-label">Nombre del cliente</label><input type="text" id="input-client-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Café Luna"></div>
       <div class="field"><label class="field-label">Estado</label><select id="input-client-status"><option value="">Sin estado</option>${statusOptions}</select></div>
+
+      <div class="field-row">
+        <div class="field"><label class="field-label">Estado de pago</label><select id="input-client-payment-status"><option value="">Sin estado</option>${paymentOptions}</select></div>
+        <div class="field"><label class="field-label">Monto adeudado ($)</label><input type="number" min="0" step="0.01" id="input-client-amount-owed" value="${data && data.amountOwed ? data.amountOwed : ''}" placeholder="0"></div>
+      </div>
+
+      <div class="field"><label class="field-label">Instagram</label><input type="text" id="input-client-instagram" value="${escapeHtml(data?data.instagramLink||'':'')}" placeholder="https://instagram.com/..."></div>
+      <div class="field"><label class="field-label">Drive</label><input type="text" id="input-client-drive" value="${escapeHtml(data?data.driveLink||'':'')}" placeholder="https://drive.google.com/..."></div>
+      <div class="field"><label class="field-label">Tracker del cliente</label><input type="text" id="input-client-tracker" value="${escapeHtml(data?data.trackerLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Contrato</label><input type="text" id="input-client-contract" value="${escapeHtml(data?data.contractLink||'':'')}" placeholder="https://..."></div>
+
       <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client">Guardar</button></div>
     </div></div>`;
   }
@@ -1555,13 +1641,22 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(saveClientBtn) saveClientBtn.onclick = () => withBusy(async () => {
       const name = document.getElementById('input-client-name').value.trim();
       if(!name) return;
-      const status = document.getElementById('input-client-status').value;
+      const payload = {
+        name,
+        status: document.getElementById('input-client-status').value,
+        payment_status: document.getElementById('input-client-payment-status').value,
+        amount_owed: Number(document.getElementById('input-client-amount-owed').value) || 0,
+        instagram_link: document.getElementById('input-client-instagram').value.trim(),
+        drive_link: document.getElementById('input-client-drive').value.trim(),
+        tracker_link: document.getElementById('input-client-tracker').value.trim(),
+        contract_link: document.getElementById('input-client-contract').value.trim(),
+      };
       const data = state.modal.data;
       if(data){
-        const { error } = await supabase.from('clients').update({ name, status }).eq('id', data.id);
+        const { error } = await supabase.from('clients').update(payload).eq('id', data.id);
         if(error) throw error;
       } else {
-        const { error } = await supabase.from('clients').insert({ name, status });
+        const { error } = await supabase.from('clients').insert(payload);
         if(error) throw error;
       }
       closeModal();

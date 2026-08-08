@@ -30,10 +30,16 @@ create table if not exists public.editors (
 );
 
 create table if not exists public.clients (
-  id         uuid primary key default gen_random_uuid(),
-  name       text not null,
-  status     text not null default '',
-  created_at timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  name            text not null,
+  status          text not null default '',
+  payment_status  text not null default '' check (payment_status in ('', 'Al día', 'Debe', 'No paga')),
+  amount_owed     numeric not null default 0,
+  instagram_link  text not null default '',
+  drive_link      text not null default '',
+  tracker_link    text not null default '',
+  contract_link   text not null default '',
+  created_at      timestamptz not null default now()
 );
 
 create table if not exists public.tasks (
