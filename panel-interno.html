@@ -338,7 +338,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       id: r.id, name: r.name, status: r.status || '',
       paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0,
       instagramLink: r.instagram_link || '', driveLink: r.drive_link || '',
-      trackerLink: r.tracker_link || '', contractLink: r.contract_link || ''
+      trackerLink: r.tracker_link || '', referenceLink: r.reference_link || '',
+      brandManualLink: r.brand_manual_link || '',
+      contractLink: '' // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
     };
   }
   function taskFromRow(r){
@@ -369,10 +371,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     state.tasks = (tasksRes.data || []).map(taskFromRow);
 
     if(state.currentUser && state.currentUser.type === 'admin' && state.session){
-      const ns = await supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle();
+      const [ns, contracts] = await Promise.all([
+        supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
+        supabase.from('client_contracts').select('*')
+      ]);
       state.notifySettings = ns.data
         ? { email: ns.data.email || '', phone: ns.data.phone || '', template: ns.data.template || DEFAULT_ALERT_TEMPLATE }
         : { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE };
+      const contractByClientId = {};
+      (contracts.data || []).forEach(row => { contractByClientId[row.client_id] = row.contract_link || ''; });
+      state.clients.forEach(c => { c.contractLink = contractByClientId[c.id] || ''; });
     }
   }
 
@@ -600,7 +608,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
     </div>
     <div class="tabs">${tabsHtml}</div>
-    <div class="main" id="main-content">${ isAdmin ? renderAdminTab() : renderEditorTab() }</div>`;
+    <div class="main" id="main-content">${ renderMainContent(isAdmin) }</div>`;
   }
 
   function exportData(){
@@ -683,6 +691,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <p class="goal-message">Esto arma el mensaje automáticamente por cada tarea atrasada, pero no lo envía solo: tocás "Enviar por email" o "Enviar por WhatsApp" y se abre ya redactado, listo para mandar con un toque más.</p>
       </div>
     `;
+  }
+
+  function renderMainContent(isAdmin){
+    if(state.clientDetailId){
+      const detailClient = state.clients.find(c=>c.id===state.clientDetailId);
+      if(detailClient) return renderClientProfile(detailClient, isAdmin);
+      state.clientDetailId = null; // cliente eliminado u otro id inválido
+    }
+    return isAdmin ? renderAdminTab() : renderEditorTab();
   }
 
   function renderAdminTab(){
@@ -1045,6 +1062,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           ${ isAdmin ? `<div class="mono" style="font-size:10px; color:var(--ink-soft); margin-top:3px; text-transform:none; letter-spacing:0;">Generado ${fmtMoney(generatedAmount)} ${t.paid ? '· ya pagado' : '· sin pagar'}</div>` : '' }
         </div>
         <div class="task-actions">
+          ${ t.clientId ? `<button class="btn btn-ghost btn-sm" data-view-client="${t.clientId}">Ver cliente</button>` : '' }
           ${ isAdmin ? `<button class="btn btn-ghost btn-sm" data-toggle-paid="${t.id}">${t.paid ? 'Marcar sin pagar' : 'Marcar pagado'}</button>` : '' }
           <button class="btn btn-ghost btn-sm" data-duplicate-task="${t.id}">Duplicar</button>
           <button class="btn btn-ghost btn-sm" data-edit-task="${t.id}">Editar</button>
@@ -1082,11 +1100,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderClientesManage(){
-    if(state.clientDetailId){
-      const detailClient = state.clients.find(c=>c.id===state.clientDetailId);
-      if(detailClient) return renderClientProfile(detailClient);
-    }
-
     let clients = state.clients.slice();
     if(state.filter.clientStatus) clients = clients.filter(c => (c.status||'') === state.filter.clientStatus);
 
@@ -1126,7 +1139,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     `;
   }
 
-  function renderClientProfile(client){
+  function renderClientProfile(client, isAdmin){
     const clientTasks = state.tasks.filter(t=>t.clientId===client.id);
 
     const linkRow = (label, url) => `
@@ -1145,14 +1158,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     `).join('');
 
     return `
-      <button class="btn btn-ghost btn-sm" id="btn-back-to-clients" style="margin-bottom:22px;">← Volver a clientes</button>
+      <button class="btn btn-ghost btn-sm" id="btn-back-to-clients" style="margin-bottom:22px;">← Volver</button>
 
       <div class="section-head">
         <div><span class="section-tag">Ficha de cliente</span><h2 class="section-title">${escapeHtml(client.name)}</h2></div>
+        ${ isAdmin ? `
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost btn-sm" data-edit-client="${client.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-client="${client.id}">Eliminar</button>
-        </div>
+        </div>` : '' }
       </div>
 
       <div class="stat-grid">
@@ -1168,7 +1182,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           ${linkRow('Instagram', client.instagramLink)}
           ${linkRow('Drive', client.driveLink)}
           ${linkRow('Tracker', client.trackerLink)}
-          ${linkRow('Contrato', client.contractLink)}
+          ${linkRow('Referencias', client.referenceLink)}
+          ${linkRow('Manual de marca', client.brandManualLink)}
+          ${ isAdmin ? linkRow('Contrato', client.contractLink) : '' }
         </div>
       </div>
 
@@ -1508,7 +1524,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="field"><label class="field-label">Instagram</label><input type="text" id="input-client-instagram" value="${escapeHtml(data?data.instagramLink||'':'')}" placeholder="https://instagram.com/..."></div>
       <div class="field"><label class="field-label">Drive</label><input type="text" id="input-client-drive" value="${escapeHtml(data?data.driveLink||'':'')}" placeholder="https://drive.google.com/..."></div>
       <div class="field"><label class="field-label">Tracker del cliente</label><input type="text" id="input-client-tracker" value="${escapeHtml(data?data.trackerLink||'':'')}" placeholder="https://..."></div>
-      <div class="field"><label class="field-label">Contrato</label><input type="text" id="input-client-contract" value="${escapeHtml(data?data.contractLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Referencias</label><input type="text" id="input-client-reference" value="${escapeHtml(data?data.referenceLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Manual de marca</label><input type="text" id="input-client-brand-manual" value="${escapeHtml(data?data.brandManualLink||'':'')}" placeholder="https://..."></div>
+      <div class="field">
+        <label class="field-label">Contrato</label>
+        <input type="text" id="input-client-contract" value="${escapeHtml(data?data.contractLink||'':'')}" placeholder="https://...">
+        <p class="field-hint">Este link no lo ven los editores — solo vos, como administrador.</p>
+      </div>
 
       <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client">Guardar</button></div>
     </div></div>`;
@@ -1649,16 +1671,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         instagram_link: document.getElementById('input-client-instagram').value.trim(),
         drive_link: document.getElementById('input-client-drive').value.trim(),
         tracker_link: document.getElementById('input-client-tracker').value.trim(),
-        contract_link: document.getElementById('input-client-contract').value.trim(),
+        reference_link: document.getElementById('input-client-reference').value.trim(),
+        brand_manual_link: document.getElementById('input-client-brand-manual').value.trim(),
       };
+      const contractLink = document.getElementById('input-client-contract').value.trim();
       const data = state.modal.data;
+      let clientId = data ? data.id : null;
       if(data){
         const { error } = await supabase.from('clients').update(payload).eq('id', data.id);
         if(error) throw error;
       } else {
-        const { error } = await supabase.from('clients').insert(payload);
+        const { data: inserted, error } = await supabase.from('clients').insert(payload).select().single();
         if(error) throw error;
+        clientId = inserted.id;
       }
+      const { error: contractError } = await supabase.from('client_contracts')
+        .upsert({ client_id: clientId, contract_link: contractLink }, { onConflict: 'client_id' });
+      if(contractError) throw contractError;
       closeModal();
       await reloadData();
       render();

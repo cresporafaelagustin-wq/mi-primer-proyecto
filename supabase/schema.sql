@@ -30,16 +30,28 @@ create table if not exists public.editors (
 );
 
 create table if not exists public.clients (
-  id              uuid primary key default gen_random_uuid(),
-  name            text not null,
-  status          text not null default '',
-  payment_status  text not null default '' check (payment_status in ('', 'Al día', 'Debe', 'No paga')),
-  amount_owed     numeric not null default 0,
-  instagram_link  text not null default '',
-  drive_link      text not null default '',
-  tracker_link    text not null default '',
-  contract_link   text not null default '',
-  created_at      timestamptz not null default now()
+  id                 uuid primary key default gen_random_uuid(),
+  name               text not null,
+  status             text not null default '',
+  payment_status     text not null default '' check (payment_status in ('', 'Al día', 'Debe', 'No paga')),
+  amount_owed        numeric not null default 0,
+  instagram_link     text not null default '',
+  drive_link         text not null default '',
+  tracker_link       text not null default '',
+  reference_link     text not null default '',
+  brand_manual_link  text not null default '',
+  created_at         timestamptz not null default now()
+);
+
+-- El link del contrato vive en su propia tabla (no como columna de
+-- clients) a propósito: es el único dato de cliente que un editor NO
+-- debe poder leer. Row Level Security filtra por fila, no por columna,
+-- así que separarlo en su propia tabla con su propia policy es la forma
+-- correcta de ocultarlo a nivel de base de datos (no solo en la pantalla).
+create table if not exists public.client_contracts (
+  client_id     uuid primary key references public.clients(id) on delete cascade,
+  contract_link text not null default '',
+  updated_at    timestamptz not null default now()
 );
 
 create table if not exists public.tasks (
@@ -151,6 +163,7 @@ $$;
 
 alter table public.editors enable row level security;
 alter table public.clients enable row level security;
+alter table public.client_contracts enable row level security;
 alter table public.tasks enable row level security;
 alter table public.notify_settings enable row level security;
 alter table public.admin_emails enable row level security;
@@ -178,6 +191,12 @@ create policy "admin full access clients" on public.clients
 drop policy if exists "editor read clients" on public.clients;
 create policy "editor read clients" on public.clients
   for select using (public.current_role() = 'editor');
+
+-- client_contracts: solo admin, ni lectura para editores. Esto es lo que
+-- realmente oculta el contrato — no una decisión de la pantalla.
+drop policy if exists "admin only client_contracts" on public.client_contracts;
+create policy "admin only client_contracts" on public.client_contracts
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
 
 -- tasks: admin puede todo; un editor solo puede ver/crear/editar/borrar
 -- las tareas asignadas a sí mismo.
