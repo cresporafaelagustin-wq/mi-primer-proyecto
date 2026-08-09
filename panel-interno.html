@@ -110,34 +110,47 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .app-shell{ display:flex; align-items:stretch; min-height:100vh; }
 
 .sidebar{
-  width:264px; flex-shrink:0; background:var(--ink); color:var(--cream);
-  display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto;
+  width:80px; flex-shrink:0; background:var(--ink); color:var(--cream);
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow:hidden;
   border-right:1px solid var(--divider-dark);
+  transition: width .22s ease;
 }
-.sidebar-top{ padding:30px 26px 24px; }
+.sidebar:hover, .sidebar:focus-within{ width:264px; overflow-y:auto; }
+.sidebar-top{ padding:30px 24px 24px; }
 .wordmark{ font-family:'Playfair Display', serif; font-weight:900; font-size:19px; letter-spacing:0.02em; margin-bottom:7px; }
 .topbar-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,244,239,0.55); }
 
+/* Texto que solo aparece cuando el sidebar está expandido (hover/foco) */
+.sidebar-hide-label{
+  display:inline-block; white-space:nowrap; opacity:0; max-width:0; overflow:hidden; vertical-align:middle;
+  transition: opacity .14s ease, max-width .22s ease;
+}
+.sidebar:hover .sidebar-hide-label, .sidebar:focus-within .sidebar-hide-label{ opacity:1; max-width:220px; }
+
 .sidebar-nav{ display:flex; flex-direction:column; padding:4px 0; flex:1; }
 .tab-btn{
-  padding:13px 26px; background:none; border:none; color:rgba(245,244,239,0.55); font-size:12.5px;
+  display:flex; align-items:center; gap:14px;
+  padding:13px 24px; background:none; border:none; color:rgba(245,244,239,0.55); font-size:12.5px;
   cursor:pointer; text-align:left; font-family:'Inter',sans-serif; font-weight:600;
   text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
   border-left:2px solid transparent;
   transition: color .18s ease, border-color .18s ease, background-color .18s ease;
 }
+.tab-btn-mark{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.02em; width:20px; flex-shrink:0; }
 .tab-btn.active{ color:var(--cream); border-left-color:var(--cream); background:rgba(245,244,239,0.06); }
 .tab-btn:hover{ color:var(--cream); background:rgba(245,244,239,0.06); }
 
-.sidebar-bottom{ padding:20px 26px 26px; border-top:1px solid var(--divider-dark); display:flex; flex-direction:column; gap:10px; }
+.sidebar-bottom{ padding:20px 24px 26px; border-top:1px solid var(--divider-dark); display:flex; flex-direction:column; gap:10px; }
 .sidebar-bottom .user-badge{ width:100%; box-sizing:border-box; }
 .sidebar-bottom .btn{ width:100%; }
+.sidebar-btn{ display:flex; align-items:center; justify-content:center; gap:10px; }
+.sidebar-btn-mark{ flex-shrink:0; font-size:14px; line-height:1; }
 .user-badge{
   display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--cream);
   font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; text-transform:uppercase;
   border:1px solid var(--divider-dark); padding:7px 13px;
 }
-.user-dot{ width:6px; height:6px; background:var(--cream); }
+.user-dot{ width:6px; height:6px; background:var(--cream); flex-shrink:0; }
 .user-dot.admin{ background:var(--cream); }
 
 .main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; }
@@ -145,7 +158,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
 @media (max-width:860px){
   .app-shell{ flex-direction:column; }
-  .sidebar{ width:100%; height:auto; position:static; flex-direction:row; align-items:center; overflow-x:auto; border-right:none; border-bottom:1px solid var(--divider-dark); }
+  .sidebar{ width:100% !important; height:auto; position:static; flex-direction:row; align-items:center; overflow-x:auto; border-right:none; border-bottom:1px solid var(--divider-dark); }
+  .sidebar-hide-label{ opacity:1 !important; max-width:220px !important; }
   .sidebar-top{ padding:14px 18px; flex-shrink:0; }
   .sidebar-top .topbar-eyebrow{ display:none; }
   .sidebar-top .wordmark{ margin-bottom:0; }
@@ -716,24 +730,24 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderShell(){
     const isAdmin = state.currentUser.type === 'admin';
     const userLabel = isAdmin ? 'Administrador' : editorName(state.currentUser.id);
-    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
-    const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mis-proyecciones','Mis proyecciones']];
+    const adminTabs = [['resumen','Resumen','RE'],['tareas','Tareas','TA'],['alertas','Alertas','AL'],['editores','Editores','ED'],['clientes','Clientes','CL'],['finanzas','Finanzas','FI']];
+    const editorTabs = [['resumen','Resumen','RE'],['mis-tareas','Mis tareas','MT'],['mis-proyecciones','Mis proyecciones','MP']];
     const tabs = isAdmin ? adminTabs : editorTabs;
-    const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${label}</button>`).join('');
+    const tabsHtml = tabs.map(([key,label,mark]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}"><span class="tab-btn-mark">${mark}</span><span class="sidebar-hide-label">${label}</span></button>`).join('');
 
     return `
     <div class="app-shell">
-      <aside class="sidebar">
+      <aside class="sidebar" tabindex="0">
         <div class="sidebar-top">
           <div class="wordmark">SCA</div>
-          <span class="topbar-eyebrow">Sistema de contenido autónomo</span>
+          <span class="topbar-eyebrow sidebar-hide-label">Sistema de contenido autónomo</span>
         </div>
         <nav class="sidebar-nav">${tabsHtml}</nav>
         <div class="sidebar-bottom">
-          <div class="user-badge"><span class="user-dot"></span>${escapeHtml(userLabel)}</div>
-          ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-export-data" style="border-color:var(--cream);color:var(--cream);">Exportar datos</button>` : '' }
-          ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-import-backup" style="border-color:var(--cream);color:var(--cream);">Importar backup</button>` : '' }
-          <button class="btn btn-ghost btn-sm" id="btn-logout" style="border-color:var(--cream);color:var(--cream);">Salir</button>
+          <div class="user-badge"><span class="user-dot"></span><span class="sidebar-hide-label">${escapeHtml(userLabel)}</span></div>
+          ${ isAdmin ? `<button class="btn btn-ghost btn-sm sidebar-btn" id="btn-export-data" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">↓</span><span class="sidebar-hide-label">Exportar datos</span></button>` : '' }
+          ${ isAdmin ? `<button class="btn btn-ghost btn-sm sidebar-btn" id="btn-import-backup" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">↑</span><span class="sidebar-hide-label">Importar backup</span></button>` : '' }
+          <button class="btn btn-ghost btn-sm sidebar-btn" id="btn-logout" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">×</span><span class="sidebar-hide-label">Salir</span></button>
         </div>
       </aside>
       <div class="main" id="main-content">${ renderMainContent(isAdmin) }</div>
