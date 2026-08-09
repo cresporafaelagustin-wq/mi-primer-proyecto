@@ -182,6 +182,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
 /* ============ TASK GRID / CARDS ============ */
 .task-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; }
+.task-list{ display:flex; flex-direction:column; gap:14px; }
+.task-list .task-card{ flex-direction:row; flex-wrap:wrap; align-items:flex-start; gap:16px 32px; }
+.task-list .task-top{ flex:1 1 260px; min-width:220px; }
+.task-list .task-meta{ flex:1 1 200px; align-self:center; }
+.task-list > .task-card > div:has(.unit-grid){ flex:1 1 180px; }
+.task-list .progress-editor{ flex:1 1 220px; min-width:180px; }
+.task-list .task-links{ flex:1 1 280px; min-width:240px; }
+.task-list .task-footer{ flex-basis:100%; }
 .task-card{ background:var(--paper); border:1px solid var(--ink); padding:20px 22px; display:flex; flex-direction:column; gap:14px; }
 .task-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .task-project{ font-family:'Playfair Display', serif; font-weight:600; font-size:18px; line-height:1.2; }
@@ -1123,7 +1131,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${ tasks.length === 0 ? emptyState(
           isAdmin ? 'No hay tareas todavía' : 'Todavía no tenés tareas asignadas',
           isAdmin ? 'Creá una tarea y asignala a un editor y un cliente.' : 'Tu administrador te va a asignar proyectos acá.'
-        ) : `<div class="task-grid">${cards}</div>` }
+        ) : `<div class="task-list">${cards}</div>` }
     `;
   }
 
