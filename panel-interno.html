@@ -235,6 +235,19 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .manage-row-name-btn{ background:none; border:none; padding:0; margin:0; font-family:'Playfair Display', serif; font-weight:600; font-size:15.5px; color:var(--ink); cursor:pointer; text-align:left; }
 .manage-row-name-btn:hover{ text-decoration:underline; }
 .manage-row .sub{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-top:4px; }
+.manage-row-main{ display:flex; align-items:center; gap:13px; min-width:0; }
+
+.avatar-mark{
+  width:32px; height:32px; flex-shrink:0; border:1px solid var(--ink); background:var(--paper);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; letter-spacing:0.02em; color:var(--ink);
+}
+.avatar-mark.filled{ background:var(--ink); color:var(--cream); }
+
+.mini-bar-cell{ display:flex; flex-direction:column; gap:5px; min-width:120px; }
+.mini-bar-track{ height:6px; background:var(--paper-line); position:relative; }
+.mini-bar-fill{ height:100%; background:var(--ink); }
+.mini-bar-label{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); letter-spacing:0.03em; }
 
 .empty-state{ text-align:center; padding:60px 20px; border:1px dashed var(--paper-line); }
 .empty-state h3{ font-family:'Playfair Display', serif; font-weight:600; color:var(--ink); font-size:17px; margin-bottom:8px; }
@@ -537,6 +550,17 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
   function editorName(id){ const e = state.editors.find(x=>x.id===id); return e ? e.name : 'Sin asignar'; }
   function clientName(id){ const c = state.clients.find(x=>x.id===id); return c ? c.name : 'Sin cliente'; }
+  function avatarMark(name, filled){
+    const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+    return `<span class="avatar-mark${filled?' filled':''}">${escapeHtml(initial)}</span>`;
+  }
+  function miniBarCell(label, fraction){
+    const pct = Math.max(0, Math.min(100, fraction * 100));
+    return `<div class="mini-bar-cell">
+      <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pct}%;"></div></div>
+      <div class="mini-bar-label">${escapeHtml(label)}</div>
+    </div>`;
+  }
   function paymentAccountName(id){ const a = state.paymentAccounts.find(x=>x.id===id); return a ? a.name : ''; }
   function accountOptionsHtml(selectedId){
     return `<option value="">Sin cuenta</option>${state.paymentAccounts.map(a=>`<option value="${a.id}" ${selectedId===a.id?'selected':''}>${escapeHtml(a.name)}</option>`).join('')}`;
@@ -1152,9 +1176,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const videosRemaining = myTasks.reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
       const earned = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
       return `<div class="manage-row">
-        <div>
-          <div class="name">${escapeHtml(e.name)}</div>
-          <div class="sub">${n} tarea${n===1?'':'s'} asignada${n===1?'':'s'} · ${videosRemaining} video${videosRemaining===1?'':'s'} por hacer · ${fmtMoney(earned)} generado${ e.email ? ' · ' + escapeHtml(e.email) : ' · sin email (no puede iniciar sesión)' }</div>
+        <div class="manage-row-main">
+          ${avatarMark(e.name)}
+          <div>
+            <div class="name">${escapeHtml(e.name)}</div>
+            <div class="sub">${n} tarea${n===1?'':'s'} asignada${n===1?'':'s'} · ${videosRemaining} video${videosRemaining===1?'':'s'} por hacer · ${fmtMoney(earned)} generado${ e.email ? ' · ' + escapeHtml(e.email) : ' · sin email (no puede iniciar sesión)' }</div>
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           ${ e.trackerLink
@@ -1179,9 +1206,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const rows = clients.map(c=>{
       const n = state.tasks.filter(t=>t.clientId===c.id).length;
       return `<div class="manage-row">
-        <div>
-          <button class="manage-row-name-btn" data-view-client="${c.id}">${escapeHtml(c.name)}</button>
-          <div class="sub">${n} tarea${n===1?'':'s'} asociada${n===1?'':'s'}</div>
+        <div class="manage-row-main">
+          ${avatarMark(c.name)}
+          <div>
+            <button class="manage-row-name-btn" data-view-client="${c.id}">${escapeHtml(c.name)}</button>
+            <div class="sub">${n} tarea${n===1?'':'s'} asociada${n===1?'':'s'}</div>
+          </div>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
           <button class="client-status-btn" data-assign-status="${c.id}">${c.status ? escapeHtml(c.status) : 'Asignar estado'}</button>
@@ -1339,7 +1369,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     const accountRows = state.paymentAccounts.map(a=>`
       <div class="manage-row">
-        <div><div class="name">${escapeHtml(a.name)}</div><div class="sub">Saldo ${fmtMoney(a.balance)}</div></div>
+        <div class="manage-row-main">
+          ${avatarMark(a.name, true)}
+          <div><div class="name">${escapeHtml(a.name)}</div><div class="sub">Saldo ${fmtMoney(a.balance)}</div></div>
+        </div>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost btn-sm" data-edit-account="${a.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-account="${a.id}">Eliminar</button>
@@ -1348,7 +1381,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     const expenseRows = state.fixedExpenses.map(e=>`
       <div class="manage-row">
-        <div><div class="name">${escapeHtml(e.name)}</div><div class="sub">${fmtMoney(e.cost)} · Sale de ${e.payoutAccountId ? escapeHtml(paymentAccountName(e.payoutAccountId)) : 'sin cuenta'}</div></div>
+        <div class="manage-row-main">
+          ${avatarMark(e.name)}
+          <div><div class="name">${escapeHtml(e.name)}</div><div class="sub">${fmtMoney(e.cost)} · Sale de ${e.payoutAccountId ? escapeHtml(paymentAccountName(e.payoutAccountId)) : 'sin cuenta'}</div></div>
+        </div>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost btn-sm" data-edit-expense="${e.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-expense="${e.id}">Eliminar</button>
@@ -1360,7 +1396,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const total = myClients.reduce((s,c)=>s+clientReferrerCommissionAmount(c),0);
       const pending = myClients.filter(c=>!c.referrerPaid).reduce((s,c)=>s+clientReferrerCommissionAmount(c),0);
       return `<div class="manage-row">
-        <div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${myClients.length} cliente${myClients.length===1?'':'s'} · Total ${fmtMoney(total)} · Pendiente ${fmtMoney(pending)} · Sale de ${r.payoutAccountId ? escapeHtml(paymentAccountName(r.payoutAccountId)) : 'sin cuenta'}</div></div>
+        <div class="manage-row-main">
+          ${avatarMark(r.name)}
+          <div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${myClients.length} cliente${myClients.length===1?'':'s'} · Total ${fmtMoney(total)} · Pendiente ${fmtMoney(pending)} · Sale de ${r.payoutAccountId ? escapeHtml(paymentAccountName(r.payoutAccountId)) : 'sin cuenta'}</div></div>
+        </div>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost btn-sm" data-edit-referrer="${r.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-referrer="${r.id}">Eliminar</button>
@@ -1368,14 +1407,19 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>`;
     }).join('');
 
-    const clientFinanceRows = clients.map(c=>`
+    const clientFinanceRows = clients.map(c=>{
+      const income = Number(c.totalIncome||0);
+      const cost = clientEditingCost(c.id);
+      const costFraction = income > 0 ? cost / income : (cost > 0 ? 1 : 0);
+      return `
       <tr>
-        <td><button class="manage-row-name-btn" data-view-client="${c.id}">${escapeHtml(c.name)}</button></td>
-        <td class="mono">${fmtMoney(c.totalIncome)}</td>
-        <td class="mono">${fmtMoney(clientEditingCost(c.id))}</td>
+        <td style="display:flex; align-items:center; gap:10px;">${avatarMark(c.name)}<button class="manage-row-name-btn" data-view-client="${c.id}">${escapeHtml(c.name)}</button></td>
+        <td class="mono">${fmtMoney(income)}</td>
+        <td>${miniBarCell(fmtMoney(cost) + ' costo', costFraction)}</td>
         <td class="mono">${fmtMoney(clientNetProfit(c))}</td>
         <td>${c.paymentStatus ? escapeHtml(c.paymentStatus) : 'Sin estado'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     return `
       <div class="section-head"><div><span class="section-tag">06 — Finanzas</span><h2 class="section-title">Panel financiero</h2></div></div>
