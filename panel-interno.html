@@ -78,6 +78,7 @@ a{ color:inherit; }
 input, select, textarea{
   background: var(--paper); border:1px solid var(--paper-line); color:var(--ink);
   padding:10px 12px; border-radius:0; font-size:13.5px; font-family:'Inter',sans-serif; width:100%;
+  transition: border-color .18s ease;
 }
 input::placeholder{ color:#A6A49B; }
 input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--ink); }
@@ -92,7 +93,7 @@ label.field-label{
 button.btn{
   font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; cursor:pointer;
   border-radius:0; padding:11px 18px; border:1px solid var(--ink); text-transform:uppercase; letter-spacing:0.05em;
-  transition: background .12s, color .12s;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease;
 }
 button.btn:disabled{ opacity:0.5; cursor:default; }
 .btn-primary{ background:var(--ink); color:var(--cream); }
@@ -105,16 +106,32 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .on-dark .btn-ghost{ border-color:var(--cream); color:var(--cream); }
 .on-dark .btn-ghost:hover{ background:var(--cream); color:var(--ink); }
 
-/* ============ TOPBAR (dark / masthead) ============ */
-.topbar{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:18px 28px; background:var(--ink); color:var(--cream); border-bottom:1px solid var(--divider-dark);
-  position:sticky; top:0; z-index:5;
+/* ============ APP SHELL / SIDEBAR (dark / masthead) ============ */
+.app-shell{ display:flex; align-items:stretch; min-height:100vh; }
+
+.sidebar{
+  width:264px; flex-shrink:0; background:var(--ink); color:var(--cream);
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto;
+  border-right:1px solid var(--divider-dark);
 }
-.topbar-left{ display:flex; align-items:baseline; gap:14px; }
-.wordmark{ font-family:'Playfair Display', serif; font-weight:900; font-size:19px; letter-spacing:0.02em; }
+.sidebar-top{ padding:30px 26px 24px; }
+.wordmark{ font-family:'Playfair Display', serif; font-weight:900; font-size:19px; letter-spacing:0.02em; margin-bottom:7px; }
 .topbar-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,244,239,0.55); }
-.topbar-right{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+
+.sidebar-nav{ display:flex; flex-direction:column; padding:4px 0; flex:1; }
+.tab-btn{
+  padding:13px 26px; background:none; border:none; color:rgba(245,244,239,0.55); font-size:12.5px;
+  cursor:pointer; text-align:left; font-family:'Inter',sans-serif; font-weight:600;
+  text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
+  border-left:2px solid transparent;
+  transition: color .18s ease, border-color .18s ease, background-color .18s ease;
+}
+.tab-btn.active{ color:var(--cream); border-left-color:var(--cream); background:rgba(245,244,239,0.06); }
+.tab-btn:hover{ color:var(--cream); background:rgba(245,244,239,0.06); }
+
+.sidebar-bottom{ padding:20px 26px 26px; border-top:1px solid var(--divider-dark); display:flex; flex-direction:column; gap:10px; }
+.sidebar-bottom .user-badge{ width:100%; box-sizing:border-box; }
+.sidebar-bottom .btn{ width:100%; }
 .user-badge{
   display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--cream);
   font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; text-transform:uppercase;
@@ -123,17 +140,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .user-dot{ width:6px; height:6px; background:var(--cream); }
 .user-dot.admin{ background:var(--cream); }
 
-.tabs{ display:flex; gap:0; padding:0 28px; border-bottom:1px solid var(--paper-line); background:var(--paper); overflow-x:auto; }
-.tab-btn{
-  padding:14px 18px; background:none; border:none; color:var(--ink-soft); font-size:12.5px;
-  cursor:pointer; border-bottom:2px solid transparent; font-family:'Inter',sans-serif; font-weight:600;
-  text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
-}
-.tab-btn.active{ color:var(--ink); border-bottom-color:var(--ink); }
-.tab-btn:hover{ color:var(--ink); }
+.main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; }
+.section-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
 
-.main{ flex:1; padding:32px 28px 70px; max-width:1120px; width:100%; margin:0 auto; }
-.section-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
+@media (max-width:860px){
+  .app-shell{ flex-direction:column; }
+  .sidebar{ width:100%; height:auto; position:static; flex-direction:row; align-items:center; overflow-x:auto; border-right:none; border-bottom:1px solid var(--divider-dark); }
+  .sidebar-top{ padding:14px 18px; flex-shrink:0; }
+  .sidebar-top .topbar-eyebrow{ display:none; }
+  .sidebar-top .wordmark{ margin-bottom:0; }
+  .sidebar-nav{ flex-direction:row; flex:none; padding:0; }
+  .tab-btn{ border-left:none; border-bottom:2px solid transparent; padding:16px 16px; }
+  .tab-btn.active{ border-left-color:transparent; border-bottom-color:var(--cream); }
+  .sidebar-bottom{ flex-direction:row; border-top:none; border-left:1px solid var(--divider-dark); padding:10px 14px; flex-shrink:0; }
+  .sidebar-bottom .user-badge{ width:auto; }
+  .sidebar-bottom .btn{ width:auto; white-space:nowrap; }
+  .main{ padding:28px 20px 64px; }
+}
 
 /* ============ STAT PLATES (dark cards on light page) ============ */
 .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px; margin-bottom:34px; background:var(--paper-line); border:1px solid var(--paper-line); }
@@ -691,20 +714,22 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${label}</button>`).join('');
 
     return `
-    <div class="topbar">
-      <div class="topbar-left">
-        <div class="wordmark">SCA</div>
-        <span class="topbar-eyebrow">Sistema de contenido autónomo — panel interno</span>
-      </div>
-      <div class="topbar-right">
-        <div class="user-badge"><span class="user-dot"></span>${escapeHtml(userLabel)}</div>
-        ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-export-data" style="border-color:var(--cream);color:var(--cream);">Exportar datos</button>` : '' }
-        ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-import-backup" style="border-color:var(--cream);color:var(--cream);">Importar backup</button>` : '' }
-        <button class="btn btn-ghost btn-sm" id="btn-logout" style="border-color:var(--cream);color:var(--cream);">Salir</button>
-      </div>
-    </div>
-    <div class="tabs">${tabsHtml}</div>
-    <div class="main" id="main-content">${ renderMainContent(isAdmin) }</div>`;
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="wordmark">SCA</div>
+          <span class="topbar-eyebrow">Sistema de contenido autónomo</span>
+        </div>
+        <nav class="sidebar-nav">${tabsHtml}</nav>
+        <div class="sidebar-bottom">
+          <div class="user-badge"><span class="user-dot"></span>${escapeHtml(userLabel)}</div>
+          ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-export-data" style="border-color:var(--cream);color:var(--cream);">Exportar datos</button>` : '' }
+          ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-import-backup" style="border-color:var(--cream);color:var(--cream);">Importar backup</button>` : '' }
+          <button class="btn btn-ghost btn-sm" id="btn-logout" style="border-color:var(--cream);color:var(--cream);">Salir</button>
+        </div>
+      </aside>
+      <div class="main" id="main-content">${ renderMainContent(isAdmin) }</div>
+    </div>`;
   }
 
   function exportData(){
