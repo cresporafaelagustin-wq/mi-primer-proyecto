@@ -403,7 +403,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function editorFromRow(r){
     return {
       id: r.id, name: r.name, email: r.email || '', goal: Number(r.goal)||0,
-      trackerLink: r.tracker_link || '', payoutAccountId: r.payout_account_id || ''
+      trackerLink: r.tracker_link || '', payoutAccountId: r.payout_account_id || '',
+      notificationEmail: r.notification_email || '', notificationPhone: r.notification_phone || ''
     };
   }
   function paymentAccountFromRow(r){
@@ -1084,6 +1085,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <p class="goal-message">Tu administrador va a poder ver este link desde su resumen, junto con tu avance.</p>
       </div>
 
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Avisos</span><h2 class="section-title">Recordatorios de entrega</h2></div></div>
+      <div class="goal-box">
+        <div class="field-row">
+          <div class="field"><label class="field-label">Email para avisos</label><input type="email" id="input-notification-email" value="${escapeHtml(editor && editor.notificationEmail || '')}" placeholder="vos@gmail.com"></div>
+          <div class="field"><label class="field-label">WhatsApp (con código de país)</label><input type="text" id="input-notification-phone" value="${escapeHtml(editor && editor.notificationPhone || '')}" placeholder="Ej: 5491122334455"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-save-notification-contact">Guardar</button>
+        <p class="goal-message">Cuando a una tarea tuya le falten 3, 2 o 1 día para la entrega (y todavía no esté completa), te llega un email acá. El aviso por WhatsApp/SMS todavía no está activo — por ahora solo guardamos el número para cuando lo esté.</p>
+      </div>
+
       <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Detalle</span><h2 class="section-title">Tus tareas y montos</h2></div></div>
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Videos asignados</div><div class="stat-value">${doneVideos}/${totalVideos}</div></div>
@@ -1543,6 +1554,18 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(saveTrackerBtn) saveTrackerBtn.onclick = () => withBusy(async () => {
       const val = document.getElementById('input-tracker-link').value.trim();
       const { error } = await supabase.from('editors').update({ tracker_link: val }).eq('id', state.currentUser.id);
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
+
+    const saveNotificationContactBtn = document.getElementById('btn-save-notification-contact');
+    if(saveNotificationContactBtn) saveNotificationContactBtn.onclick = () => withBusy(async () => {
+      const notificationEmail = document.getElementById('input-notification-email').value.trim();
+      const notificationPhone = document.getElementById('input-notification-phone').value.trim();
+      const { error } = await supabase.from('editors')
+        .update({ notification_email: notificationEmail, notification_phone: notificationPhone })
+        .eq('id', state.currentUser.id);
       if(error) throw error;
       await reloadData();
       render();

@@ -31,13 +31,15 @@ create table if not exists public.payment_accounts (
 );
 
 create table if not exists public.editors (
-  id                uuid primary key default gen_random_uuid(),
-  name              text not null,
-  email             text unique,
-  goal              numeric not null default 0,
-  tracker_link      text not null default '',
-  payout_account_id uuid references public.payment_accounts(id) on delete set null,
-  created_at        timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  name                text not null,
+  email               text unique,
+  goal                numeric not null default 0,
+  tracker_link        text not null default '',
+  payout_account_id   uuid references public.payment_accounts(id) on delete set null,
+  notification_email  text not null default '',
+  notification_phone  text not null default '',
+  created_at          timestamptz not null default now()
 );
 
 create table if not exists public.clients (
@@ -104,10 +106,13 @@ create table if not exists public.tasks (
   deadline        date,
   price_per_video numeric not null default 0,
   paid            boolean not null default false,
-  raw_link        text not null default '',
-  edited_link     text not null default '',
-  notes           text not null default '',
-  created_at      timestamptz not null default now()
+  raw_link         text not null default '',
+  edited_link      text not null default '',
+  notes            text not null default '',
+  reminder_sent_3d boolean not null default false,
+  reminder_sent_2d boolean not null default false,
+  reminder_sent_1d boolean not null default false,
+  created_at       timestamptz not null default now()
 );
 
 -- Un admin puede tener su propia config de alertas (email/telefono/plantilla).

@@ -94,14 +94,76 @@ duplican); las tareas siempre se crean como nuevas. Los editores
 importados así no tienen email todavía (el export viejo no lo guardaba) —
 editalos después para agregarles uno y que puedan loguearse.
 
-## 8. Envío real de alertas (opcional, no incluido)
+## 8. Recordatorios de entrega (email automático)
 
-La pestaña **Alertas** arma el mensaje de cada tarea atrasada y abre un
-`mailto:` o `wa.me` para mandarlo con un clic — igual que en el panel
-original. Automatizar el envío (sin el clic) requeriría un servicio como
-Resend/SendGrid para email y Twilio para WhatsApp/SMS disparado por un cron
-o una Supabase Edge Function — no está armado en esta vuelta porque
-implica dar de alta cuentas externas; avisame si querés que lo sumemos.
+Cada editor puede cargar, en **Mis proyecciones**, un email de aviso. Si a
+una de sus tareas le quedan 3, 2 o 1 día para la entrega y todavía no está
+completa, le llega un mail solo — sin que nadie abra el panel. Esto usa
+[Resend](https://resend.com) (100 emails/día gratis) más una Supabase Edge
+Function que se dispara sola una vez al día.
+
+### 8.1 Crear la cuenta en Resend
+
+1. Andá a [resend.com](https://resend.com) y creá una cuenta gratis
+   (podés entrar con GitHub).
+2. En el dashboard, andá a **API Keys** → **Create API Key**. Ponele un
+   nombre (ej: `sca-panel`) y dejá los permisos por defecto (Full access
+   o Sending access alcanza).
+3. Copiá la clave que te muestra — empieza con `re_...`. **Guardala**, no
+   se vuelve a mostrar completa después.
+4. No hace falta verificar un dominio propio: vamos a mandar los avisos
+   desde `onboarding@resend.dev`, que Resend habilita sin configuración
+   extra (perfecto para este caso — no es spam, es transaccional).
+
+### 8.2 Correr la migración 005
+
+1. **SQL Editor** → **"+ New query"**.
+2. Copiá todo de: [`supabase/migrations/005_deadline_email_reminders.sql`](supabase/migrations/005_deadline_email_reminders.sql)
+3. Pegalo, **Run** (y **Run query** en el aviso de confirmación).
+
+### 8.3 Crear la Edge Function
+
+1. En el dashboard de Supabase, andá a **Edge Functions** (menú izquierdo).
+2. Tocá **Create a new function** (o **Deploy a new function**).
+3. Como nombre poné exactamente: `deadline-reminders`
+4. Te va a abrir un editor de código — **borrá** el contenido de ejemplo
+   y pegá todo el contenido de:
+   [`supabase/functions/deadline-reminders/index.ts`](supabase/functions/deadline-reminders/index.ts)
+5. Tocá **Deploy** (o **Save and deploy**).
+6. Una vez desplegada, andá a la configuración de esa función (⚙️ o
+   **Secrets** / **Manage secrets**) y agregá:
+   - `RESEND_API_KEY` = la clave `re_...` que copiaste en el paso 8.1.
+
+   (`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya están disponibles
+   automáticamente en toda Edge Function — no hace falta cargarlas vos.)
+
+### 8.4 Programar el envío diario
+
+1. Volvé al **SQL Editor** → **"+ New query"**.
+2. Copiá todo de: [`supabase/migrations/006_schedule_deadline_reminders.sql`](supabase/migrations/006_schedule_deadline_reminders.sql)
+3. Pegalo, **Run**. Ya viene con la URL y la clave de tu proyecto
+   completadas, no hace falta editar nada.
+
+Esto programa el aviso diario a las 13:00 UTC (~10hs Argentina). Para
+cambiar el horario, corré de nuevo el `cron.schedule(...)` con el mismo
+nombre y un horario distinto.
+
+### 8.5 Probar que funciona sin esperar al cron
+
+1. En **Edge Functions** → `deadline-reminders`, buscá el botón para
+   **invocar/probar** la función manualmente (o el link "Invoke URL").
+2. Cargá una tarea de prueba con fecha de entrega para mañana, asignada a
+   un editor con un email de aviso cargado (puede ser el tuyo).
+3. Invocá la función a mano y revisá esa casilla de correo.
+
+### Sobre WhatsApp/SMS
+
+El campo de teléfono ya se guarda (en **Mis proyecciones**), pero el
+envío automático por WhatsApp/SMS no está conectado todavía — requiere
+una cuenta de [Twilio](https://twilio.com) con tarjeta cargada (cobra por
+mensaje, sin plan gratuito real para uso continuo). Si en algún momento
+querés sumarlo, avisame y lo conectamos igual que el email, con su propio
+paso en la Edge Function.
 
 ## Qué cambió respecto al brief original
 
