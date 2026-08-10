@@ -750,7 +750,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     editores: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"></path>',
     clientes: '<rect x="3" y="8" width="18" height="12"></rect><path d="M8 8V6a4 4 0 0 1 8 0v2"></path>',
     finanzas: '<polyline points="3,17 9,11 13,15 21,5"></polyline><polyline points="15,5 21,5 21,11"></polyline>',
-    'mis-proyecciones': '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle>'
+    'mis-proyecciones': '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle>',
+    archivo: '<rect x="3" y="4" width="18" height="5"></rect><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"></path><line x1="10" y1="13" x2="14" y2="13"></line>',
+    'mi-archivo': '<rect x="3" y="4" width="18" height="5"></rect><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"></path><line x1="10" y1="13" x2="14" y2="13"></line>'
   };
   function navIcon(key){
     const paths = NAV_ICON_PATHS[key] || '';
@@ -762,8 +764,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const isAdmin = state.currentUser.type === 'admin';
     const previewing = isAdmin && isPreviewMode();
     const userLabel = isAdmin ? (previewing ? `Viendo como ${editorName(state.viewAsEditorId)}` : 'Administrador') : editorName(state.currentUser.id);
-    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
-    const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mis-proyecciones','Mis proyecciones']];
+    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['archivo','Archivo'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
+    const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mi-archivo','Archivo'],['mis-proyecciones','Mis proyecciones']];
     const tabs = (isAdmin && !previewing) ? adminTabs : editorTabs;
     const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${navIcon(key)}<span class="sidebar-hide-label">${label}</span></button>`).join('');
 
@@ -890,6 +892,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderAdminTab(){
     if(state.activeTab === 'resumen') return renderResumen();
     if(state.activeTab === 'tareas') return renderTareas(true);
+    if(state.activeTab === 'archivo') return renderArchivo(true);
     if(state.activeTab === 'alertas') return renderAlertas();
     if(state.activeTab === 'editores') return renderEditoresManage();
     if(state.activeTab === 'clientes') return renderClientesManage();
@@ -899,6 +902,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderEditorTab(){
     if(state.activeTab === 'mis-proyecciones') return renderProyeccionesEditor();
     if(state.activeTab === 'resumen') return renderResumenEditor();
+    if(state.activeTab === 'mi-archivo') return renderArchivo(false);
     return renderTareas(false);
   }
 
@@ -1170,7 +1174,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderTareas(isAdmin){
-    let tasks = state.tasks.slice();
+    let tasks = state.tasks.filter(t=>t.workflowStatus !== 'Listo'); // completadas viven en Archivo
     if(!isAdmin){ tasks = tasks.filter(t=>t.editorId===effectiveEditorId()); }
     else {
       if(state.filter.editorId) tasks = tasks.filter(t=>t.editorId===state.filter.editorId);
@@ -1204,7 +1208,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </select>
         <select id="filter-workflow">
           <option value="">Todos los estados de edición</option>
-          ${TASK_WORKFLOW_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${state.filter.workflowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+          ${TASK_WORKFLOW_STATUSES.filter(s=>s!=='Listo').map(s=>`<option value="${escapeHtml(s)}" ${state.filter.workflowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
         </select>
       </div>` : '';
 
@@ -1221,6 +1225,51 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           isAdmin ? 'No hay tareas todavía' : 'Todavía no tenés tareas asignadas',
           isAdmin ? 'Creá una tarea y asignala a un editor y un cliente.' : 'Tu administrador te va a asignar proyectos acá.'
         ) : `<div class="task-list">${cards}</div>` }
+    `;
+  }
+
+  function renderArchivo(isAdmin){
+    let tasks = state.tasks.filter(t=>t.workflowStatus === 'Listo');
+    if(!isAdmin){ tasks = tasks.filter(t=>t.editorId===effectiveEditorId()); }
+    else {
+      if(state.filter.editorId) tasks = tasks.filter(t=>t.editorId===state.filter.editorId);
+      if(state.filter.clientId) tasks = tasks.filter(t=>t.clientId===state.filter.clientId);
+    }
+
+    const groups = new Map();
+    tasks.forEach(t=>{
+      const key = monthKey(t.deadline) || 'sin-fecha';
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(t);
+    });
+    const sortedKeys = [...groups.keys()].sort((a,b)=>{
+      if(a==='sin-fecha') return 1;
+      if(b==='sin-fecha') return -1;
+      return b.localeCompare(a); // más reciente primero
+    });
+
+    const filterBar = isAdmin ? `
+      <div class="filter-bar">
+        <select id="filter-editor"><option value="">Todos los editores</option>${state.editors.map(e=>`<option value="${e.id}" ${state.filter.editorId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select>
+        <select id="filter-client"><option value="">Todos los clientes</option>${state.clients.map(c=>`<option value="${c.id}" ${state.filter.clientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+      </div>` : '';
+
+    const groupsHtml = sortedKeys.map(key=>{
+      const groupTasks = groups.get(key).slice().sort((a,b)=>(b.deadline||'').localeCompare(a.deadline||''));
+      const label = key === 'sin-fecha' ? 'Sin fecha de entrega' : monthLabel(key);
+      const cards = groupTasks.map(t=>renderTaskCard(t, isAdmin)).join('');
+      return `
+        <div class="section-head" style="margin-top:28px;"><div><span class="section-tag">${groupTasks.length} tarea${groupTasks.length===1?'':'s'}</span><h2 class="section-title" style="font-size:18px;">${escapeHtml(label)}</h2></div></div>
+        <div class="task-list">${cards}</div>
+      `;
+    }).join('');
+
+    return `
+      <div class="section-head">
+        <div><span class="section-tag">Completadas</span><h2 class="section-title">Archivo</h2></div>
+      </div>
+      ${filterBar}
+      ${ tasks.length === 0 ? emptyState('Todavía no hay tareas archivadas', 'Cuando marqués una tarea como "Listo" o toqués "Completado", se va a guardar acá agrupada por mes.') : groupsHtml }
     `;
   }
 
