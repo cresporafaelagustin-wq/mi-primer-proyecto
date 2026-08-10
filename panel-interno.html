@@ -1215,14 +1215,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
       <div class="task-links">
         <div class="link-row">
-          <span class="field-label-inline">Guión</span>
-          <input type="text" placeholder="Link del guión (si tiene)" value="${escapeHtml(t.scriptLink||'')}" data-link-id="${t.id}" data-link-type="scriptLink">
-          ${ t.scriptLink ? `<a class="open-link" href="${escapeHtml(t.scriptLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
-        </div>
-        <div class="link-row">
           <span class="field-label-inline">Crudo</span>
           <input type="text" placeholder="Link del material crudo" value="${escapeHtml(t.rawLink||'')}" data-link-id="${t.id}" data-link-type="rawLink">
           ${ t.rawLink ? `<a class="open-link" href="${escapeHtml(t.rawLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
+        </div>
+        <div class="link-row">
+          <span class="field-label-inline">Guión</span>
+          <input type="text" placeholder="Link del guión (si tiene)" value="${escapeHtml(t.scriptLink||'')}" data-link-id="${t.id}" data-link-type="scriptLink">
+          ${ t.scriptLink ? `<a class="open-link" href="${escapeHtml(t.scriptLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
         </div>
         <div class="link-row">
           <span class="field-label-inline">Editado</span>
@@ -2087,8 +2087,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           </label>
         </div>
       </div>
-      <div class="field"><label class="field-label">Link del guión (si tiene)</label><input type="text" id="input-task-script" value="${escapeHtml(src?src.scriptLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Link material crudo</label><input type="text" id="input-task-raw" value="${escapeHtml(src?src.rawLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Link del guión (si tiene)</label><input type="text" id="input-task-script" value="${escapeHtml(src?src.scriptLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Link material editado</label><input type="text" id="input-task-edited" value="${escapeHtml(src?src.editedLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Notas</label><textarea id="input-task-notes" rows="3" placeholder="Contexto, pedidos del cliente, aprobaciones pendientes...">${escapeHtml(src?src.notes||'':'')}</textarea></div>
       <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-task">Guardar</button></div>
