@@ -422,19 +422,20 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return {
       totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
       referrerId: r.referrer_id || '', referrerCommissionPct: Number(r.referrer_commission_pct)||0,
-      referrerPaid: !!r.referrer_paid, paymentAccountId: r.payment_account_id || ''
+      referrerPaid: !!r.referrer_paid, paymentAccountId: r.payment_account_id || '',
+      paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0
     };
   }
   function clientFromRow(r){
     return {
       id: r.id, name: r.name, status: r.status || '',
-      paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0,
       instagramLink: r.instagram_link || '', driveLink: r.drive_link || '',
       trackerLink: r.tracker_link || '', referenceLink: r.reference_link || '',
       brandManualLink: r.brand_manual_link || '',
       contractLink: '', // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
       totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
-      referrerPaid: false, paymentAccountId: '' // ídem: vienen de client_finance, solo para admin
+      referrerPaid: false, paymentAccountId: '', paymentStatus: '', amountOwed: 0
+      // paymentStatus/amountOwed también vienen de client_finance, solo para admin
     };
   }
   function taskFromRow(r){
@@ -492,7 +493,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         c.contractLink = contractByClientId[c.id] || '';
         Object.assign(c, financeByClientId[c.id] || {
           totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
-          referrerPaid: false, paymentAccountId: ''
+          referrerPaid: false, paymentAccountId: '', paymentStatus: '', amountOwed: 0
         });
       });
 
@@ -1399,8 +1400,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Estado</div><div class="stat-value" style="font-size:15px;">${client.status ? escapeHtml(client.status) : 'Sin estado'}</div></div>
-        <div class="stat-card"><div class="stat-label">Pago</div><div class="stat-value" style="font-size:15px;">${client.paymentStatus ? escapeHtml(client.paymentStatus) : 'Sin estado'}</div></div>
-        <div class="stat-card"><div class="stat-label">Debe</div><div class="stat-value">${fmtMoney(client.amountOwed)}</div></div>
         <div class="stat-card"><div class="stat-label">Tareas asociadas</div><div class="stat-value">${clientTasks.length}</div></div>
       </div>
 
@@ -1419,6 +1418,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${ isAdmin ? `
       <div class="section-head"><div><span class="section-tag">Solo admin</span><h2 class="section-title">Finanzas</h2></div><button class="btn btn-ghost btn-sm" data-edit-client-finance="${client.id}">Editar finanzas</button></div>
       <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Pago</div><div class="stat-value" style="font-size:15px;">${client.paymentStatus ? escapeHtml(client.paymentStatus) : 'Sin estado'}</div></div>
+        <div class="stat-card"><div class="stat-label">Debe</div><div class="stat-value">${fmtMoney(client.amountOwed)}</div></div>
         <div class="stat-card"><div class="stat-label">Ingreso total</div><div class="stat-value">${fmtMoney(client.totalIncome)}</div></div>
         <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(clientEditingCost(client.id))}</div></div>
         <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(client.gatewayFee)}</div></div>
@@ -2258,8 +2259,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const payload = {
         name,
         status: document.getElementById('input-client-status').value,
-        payment_status: document.getElementById('input-client-payment-status').value,
-        amount_owed: Number(document.getElementById('input-client-amount-owed').value) || 0,
         instagram_link: document.getElementById('input-client-instagram').value.trim(),
         drive_link: document.getElementById('input-client-drive').value.trim(),
         tracker_link: document.getElementById('input-client-tracker').value.trim(),
@@ -2267,6 +2266,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         brand_manual_link: document.getElementById('input-client-brand-manual').value.trim(),
       };
       const contractLink = document.getElementById('input-client-contract').value.trim();
+      const paymentStatus = document.getElementById('input-client-payment-status').value;
+      const amountOwed = Number(document.getElementById('input-client-amount-owed').value) || 0;
       const data = state.modal.data;
       let clientId = data ? data.id : null;
       if(data){
@@ -2280,6 +2281,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const { error: contractError } = await supabase.from('client_contracts')
         .upsert({ client_id: clientId, contract_link: contractLink }, { onConflict: 'client_id' });
       if(contractError) throw contractError;
+      const { error: financeError } = await supabase.from('client_finance')
+        .upsert({ client_id: clientId, payment_status: paymentStatus, amount_owed: amountOwed }, { onConflict: 'client_id' });
+      if(financeError) throw financeError;
       closeModal();
       await reloadData();
       render();

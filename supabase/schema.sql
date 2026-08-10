@@ -46,8 +46,6 @@ create table if not exists public.clients (
   id                 uuid primary key default gen_random_uuid(),
   name               text not null,
   status             text not null default '',
-  payment_status     text not null default '' check (payment_status in ('', 'Al día', 'Debe', 'No paga')),
-  amount_owed        numeric not null default 0,
   instagram_link     text not null default '',
   drive_link         text not null default '',
   tracker_link       text not null default '',
@@ -92,6 +90,8 @@ create table if not exists public.client_finance (
   referrer_commission_pct  numeric not null default 0,
   referrer_paid            boolean not null default false,
   payment_account_id       uuid references public.payment_accounts(id) on delete set null,
+  payment_status           text not null default '' check (payment_status in ('', 'Al día', 'Debe', 'No paga')),
+  amount_owed              numeric not null default 0,
   updated_at               timestamptz not null default now()
 );
 
