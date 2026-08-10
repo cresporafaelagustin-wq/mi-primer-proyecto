@@ -136,7 +136,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   border-left:2px solid transparent;
   transition: color .18s ease, border-color .18s ease, background-color .18s ease;
 }
-.tab-btn-mark{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.02em; width:20px; flex-shrink:0; }
+.tab-btn-icon{ flex-shrink:0; width:20px; height:20px; }
 .tab-btn.active{ color:var(--cream); border-left-color:var(--cream); background:rgba(245,244,239,0.06); }
 .tab-btn:hover{ color:var(--cream); background:rgba(245,244,239,0.06); }
 
@@ -727,14 +727,29 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(btn) btn.onclick = () => withBusy(doLogout);
   }
 
+  const NAV_ICON_PATHS = {
+    resumen: '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect>',
+    tareas: '<line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="14" y2="18"></line>',
+    'mis-tareas': '<line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="14" y2="18"></line>',
+    alertas: '<path d="M12 3 L22 20 L2 20 Z"></path><line x1="12" y1="9.5" x2="12" y2="14"></line><circle cx="12" cy="16.8" r="0.9" fill="currentColor" stroke="none"></circle>',
+    editores: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"></path>',
+    clientes: '<rect x="3" y="8" width="18" height="12"></rect><path d="M8 8V6a4 4 0 0 1 8 0v2"></path>',
+    finanzas: '<polyline points="3,17 9,11 13,15 21,5"></polyline><polyline points="15,5 21,5 21,11"></polyline>',
+    'mis-proyecciones': '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle>'
+  };
+  function navIcon(key){
+    const paths = NAV_ICON_PATHS[key] || '';
+    return `<svg class="tab-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+  }
+
   /* ================= SHELL ================= */
   function renderShell(){
     const isAdmin = state.currentUser.type === 'admin';
     const userLabel = isAdmin ? 'Administrador' : editorName(state.currentUser.id);
-    const adminTabs = [['resumen','Resumen','RE'],['tareas','Tareas','TA'],['alertas','Alertas','AL'],['editores','Editores','ED'],['clientes','Clientes','CL'],['finanzas','Finanzas','FI']];
-    const editorTabs = [['resumen','Resumen','RE'],['mis-tareas','Mis tareas','MT'],['mis-proyecciones','Mis proyecciones','MP']];
+    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
+    const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mis-proyecciones','Mis proyecciones']];
     const tabs = isAdmin ? adminTabs : editorTabs;
-    const tabsHtml = tabs.map(([key,label,mark]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}"><span class="tab-btn-mark">${mark}</span><span class="sidebar-hide-label">${label}</span></button>`).join('');
+    const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${navIcon(key)}<span class="sidebar-hide-label">${label}</span></button>`).join('');
 
     return `
     <div class="app-shell">
