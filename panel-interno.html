@@ -361,6 +361,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     activeTab: 'resumen',
     filter: { editorId:'', clientId:'', status:'', priority:'', clientStatus:'', month:'' },
     clientDetailId: null,
+    viewAsEditorId: null,
+    previewReturnTab: null,
     modal: null
   };
 
@@ -521,6 +523,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(!session){
       state.currentUser = null;
       state.profile = null;
+      state.viewAsEditorId = null;
+      state.previewReturnTab = null;
       state.ready = true;
       render();
       return;
@@ -597,6 +601,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return `<span class="priority-tag priority-${pr}">${priorityDots(pr)} ${priorityLabel(pr).toUpperCase()}</span>`;
   }
   function editorName(id){ const e = state.editors.find(x=>x.id===id); return e ? e.name : 'Sin asignar'; }
+  function isPreviewMode(){ return !!state.viewAsEditorId; }
+  function effectiveEditorId(){
+    if(state.viewAsEditorId) return state.viewAsEditorId;
+    return (state.currentUser && state.currentUser.type === 'editor') ? state.currentUser.id : null;
+  }
   function clientName(id){ const c = state.clients.find(x=>x.id===id); return c ? c.name : 'Sin cliente'; }
   function avatarMark(name, filled){
     const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -747,10 +756,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   /* ================= SHELL ================= */
   function renderShell(){
     const isAdmin = state.currentUser.type === 'admin';
-    const userLabel = isAdmin ? 'Administrador' : editorName(state.currentUser.id);
+    const previewing = isAdmin && isPreviewMode();
+    const userLabel = isAdmin ? (previewing ? `Viendo como ${editorName(state.viewAsEditorId)}` : 'Administrador') : editorName(state.currentUser.id);
     const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
     const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mis-proyecciones','Mis proyecciones']];
-    const tabs = isAdmin ? adminTabs : editorTabs;
+    const tabs = (isAdmin && !previewing) ? adminTabs : editorTabs;
     const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${navIcon(key)}<span class="sidebar-hide-label">${label}</span></button>`).join('');
 
     return `
@@ -857,8 +867,18 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderMainContent(isAdmin){
     if(state.clientDetailId){
       const detailClient = state.clients.find(c=>c.id===state.clientDetailId);
-      if(detailClient) return renderClientProfile(detailClient, isAdmin);
+      if(detailClient) return renderClientProfile(detailClient, isAdmin && !isPreviewMode());
       state.clientDetailId = null; // cliente eliminado u otro id inválido
+    }
+    if(isAdmin && isPreviewMode()){
+      const ed = state.editors.find(e=>e.id===state.viewAsEditorId);
+      if(!ed){ state.viewAsEditorId = null; return renderAdminTab(); }
+      const banner = `
+        <div style="border:2px solid var(--ink); padding:14px 18px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <span style="font-size:13.5px;">👁 Estás viendo el panel como lo ve <strong>${escapeHtml(ed.name)}</strong>. Su meta, tracker y avisos se muestran de solo lectura acá.</span>
+          <button class="btn btn-ghost btn-sm" id="btn-exit-preview">Salir de la vista previa</button>
+        </div>`;
+      return banner + renderEditorTab();
     }
     return isAdmin ? renderAdminTab() : renderEditorTab();
   }
@@ -983,8 +1003,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderResumenEditor(){
-    const editor = state.editors.find(e=>e.id===state.currentUser.id);
-    const myTasks = state.tasks.filter(t=>t.editorId===state.currentUser.id);
+    const editor = state.editors.find(e=>e.id===effectiveEditorId());
+    const myTasks = state.tasks.filter(t=>t.editorId===effectiveEditorId());
     const pending = myTasks.filter(t=>taskStatus(t)!=='completado');
     const videosRemaining = myTasks.reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
     const paidToDate = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
@@ -1077,32 +1097,40 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderProyeccionesEditor(){
-    const editor = state.editors.find(e=>e.id===state.currentUser.id);
-    const myTasks = state.tasks.filter(t=>t.editorId===state.currentUser.id);
+    const editor = state.editors.find(e=>e.id===effectiveEditorId());
+    const myTasks = state.tasks.filter(t=>t.editorId===effectiveEditorId());
     const totalVideos = myTasks.reduce((s,t)=>s+Number(t.videoCount||0),0);
     const doneVideos = myTasks.reduce((s,t)=>s+Number(t.videosDone||0),0);
     const projected = myTasks.reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
     const paidToDate = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
     const remaining = projected - paidToDate;
+    const preview = isPreviewMode();
 
     const rows = myTasks.map(t=>`
       <tr><td>${escapeHtml(t.project)}</td><td>${escapeHtml(clientName(t.clientId))}</td><td class="mono">${t.videosDone}/${t.videoCount}</td><td class="mono">${fmtMoney(t.pricePerVideo)}</td><td class="mono">${fmtMoney(Number(t.videoCount||0)*Number(t.pricePerVideo||0))}</td></tr>
     `).join('');
 
-    return `
-      <div class="section-head"><div><span class="section-tag">Tu meta</span><h2 class="section-title">Proyección de ingresos</h2></div></div>
-      ${ renderGoalWidget(editor, myTasks, true) }
-
-      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Tu tracker</span><h2 class="section-title">Link de seguimiento</h2></div></div>
+    const trackerSection = preview ? `
+      <div class="goal-box">
+        <div class="link-row"><span class="field-label-inline">Tracker</span>${ editor && editor.trackerLink ? `<a class="open-link" href="${escapeHtml(editor.trackerLink)}" target="_blank" rel="noopener">${escapeHtml(editor.trackerLink)}</a>` : `<span style="color:var(--ink-soft); font-size:12.5px;">Todavía no cargó un link</span>` }</div>
+        <p class="goal-message">Solo lectura en vista previa — esto lo edita el editor desde su propia cuenta.</p>
+      </div>` : `
       <div class="goal-box">
         <div class="field-row">
           <div class="field"><label class="field-label">Link de tu tracker</label><input type="text" id="input-tracker-link" value="${escapeHtml(editor && editor.trackerLink || '')}" placeholder="https://..."></div>
           <div style="display:flex; align-items:flex-end;"><button class="btn btn-primary btn-sm" id="btn-save-tracker" style="width:100%;">Guardar</button></div>
         </div>
         <p class="goal-message">Tu administrador va a poder ver este link desde su resumen, junto con tu avance.</p>
-      </div>
+      </div>`;
 
-      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Avisos</span><h2 class="section-title">Recordatorios de entrega</h2></div></div>
+    const notificationSection = preview ? `
+      <div class="goal-box">
+        <div class="task-meta">
+          <span>Email de avisos <span class="mono">${editor && editor.notificationEmail ? escapeHtml(editor.notificationEmail) : 'sin cargar'}</span></span>
+          <span>WhatsApp <span class="mono">${editor && editor.notificationPhone ? escapeHtml(editor.notificationPhone) : 'sin cargar'}</span></span>
+        </div>
+        <p class="goal-message">Solo lectura en vista previa — esto lo edita el editor desde su propia cuenta.</p>
+      </div>` : `
       <div class="goal-box">
         <div class="field-row">
           <div class="field"><label class="field-label">Email para avisos</label><input type="email" id="input-notification-email" value="${escapeHtml(editor && editor.notificationEmail || '')}" placeholder="vos@gmail.com"></div>
@@ -1110,7 +1138,17 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </div>
         <button class="btn btn-primary btn-sm" id="btn-save-notification-contact">Guardar</button>
         <p class="goal-message">Cuando a una tarea tuya le falten 3, 2 o 1 día para la entrega (y todavía no esté completa), te llega un email acá. El aviso por WhatsApp/SMS todavía no está activo — por ahora solo guardamos el número para cuando lo esté.</p>
-      </div>
+      </div>`;
+
+    return `
+      <div class="section-head"><div><span class="section-tag">Tu meta</span><h2 class="section-title">Proyección de ingresos</h2></div></div>
+      ${ renderGoalWidget(editor, myTasks, !preview) }
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Tu tracker</span><h2 class="section-title">Link de seguimiento</h2></div></div>
+      ${trackerSection}
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Avisos</span><h2 class="section-title">Recordatorios de entrega</h2></div></div>
+      ${notificationSection}
 
       <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Detalle</span><h2 class="section-title">Tus tareas y montos</h2></div></div>
       <div class="stat-grid">
@@ -1129,7 +1167,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   function renderTareas(isAdmin){
     let tasks = state.tasks.slice();
-    if(!isAdmin){ tasks = tasks.filter(t=>t.editorId===state.currentUser.id); }
+    if(!isAdmin){ tasks = tasks.filter(t=>t.editorId===effectiveEditorId()); }
     else {
       if(state.filter.editorId) tasks = tasks.filter(t=>t.editorId===state.filter.editorId);
       if(state.filter.clientId) tasks = tasks.filter(t=>t.clientId===state.filter.clientId);
@@ -1267,6 +1305,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           ${ e.trackerLink
               ? `<a class="open-link" href="${escapeHtml(e.trackerLink)}" target="_blank" rel="noopener">Abrir tracker</a>`
               : `<span class="mono" style="color:var(--ink-soft); font-size:10.5px;">Sin tracker</span>` }
+          <button class="btn btn-ghost btn-sm" data-view-as-editor="${e.id}">Ver como</button>
           <button class="btn btn-ghost btn-sm" data-edit-editor="${e.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-editor="${e.id}">Eliminar</button>
         </div>
@@ -1645,7 +1684,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     const newTask = document.getElementById('btn-new-task');
     if(newTask) newTask.onclick = () => {
-      const restrictEditorId = state.currentUser.type === 'editor' ? state.currentUser.id : null;
+      const restrictEditorId = isPreviewMode() ? state.viewAsEditorId : (state.currentUser.type === 'editor' ? state.currentUser.id : null);
       state.modal = { kind:'task', data:null, restrictEditorId };
       render();
     };
@@ -1736,6 +1775,21 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         render();
       };
     });
+    document.querySelectorAll('[data-view-as-editor]').forEach(btn=>{
+      btn.onclick = () => {
+        state.viewAsEditorId = btn.getAttribute('data-view-as-editor');
+        state.previewReturnTab = state.activeTab;
+        state.activeTab = 'resumen';
+        render();
+      };
+    });
+    const exitPreviewBtn = document.getElementById('btn-exit-preview');
+    if(exitPreviewBtn) exitPreviewBtn.onclick = () => {
+      state.viewAsEditorId = null;
+      state.activeTab = state.previewReturnTab || 'resumen';
+      state.previewReturnTab = null;
+      render();
+    };
     document.querySelectorAll('[data-edit-client]').forEach(btn=>{
       btn.onclick = () => {
         const c = state.clients.find(x=>x.id===btn.getAttribute('data-edit-client'));
@@ -1761,7 +1815,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     document.querySelectorAll('[data-edit-task]').forEach(btn=>{
       btn.onclick = () => {
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-edit-task'));
-        const restrictEditorId = state.currentUser.type === 'editor' ? state.currentUser.id : null;
+        const restrictEditorId = isPreviewMode() ? state.viewAsEditorId : (state.currentUser.type === 'editor' ? state.currentUser.id : null);
         state.modal = { kind:'task', data: t, restrictEditorId };
         render();
       };
@@ -1770,7 +1824,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       btn.onclick = () => {
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-duplicate-task'));
         if(!t) return;
-        const restrictEditorId = state.currentUser.type === 'editor' ? state.currentUser.id : null;
+        const restrictEditorId = isPreviewMode() ? state.viewAsEditorId : (state.currentUser.type === 'editor' ? state.currentUser.id : null);
         const seed = { ...t, videosDone: 0, paid: false, rawLink: '', editedLink: '' };
         state.modal = { kind:'task', data: null, restrictEditorId, seed };
         render();
