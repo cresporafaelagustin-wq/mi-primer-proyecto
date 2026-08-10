@@ -1317,8 +1317,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           <button class="btn btn-primary btn-sm" id="btn-new-client">+ Nuevo cliente</button>
         </div>
       </div>
+      ${ state.clients.length > 0 ? `<div class="field" style="max-width:360px;"><input type="text" id="input-client-search" placeholder="Buscar cliente por nombre..."></div>` : '' }
       ${ state.clients.length > 0 ? statusFilter : '' }
-      ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Agregá tu primer cliente o importalos desde tu planilla de Sheets.') : `<div class="manage-list">${rows}</div>` }
+      ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Agregá tu primer cliente o importalos desde tu planilla de Sheets.') : `
+      <div class="manage-list" id="clients-manage-list">${rows}</div>
+      <div id="clients-no-results" style="display:none;">${emptyState('Ningún cliente coincide', 'Probá con otro nombre o borrá el buscador.')}</div>` }
     `;
   }
 
@@ -1557,6 +1560,21 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(fp) fp.onchange = () => { state.filter.priority = fp.value; render(); };
     const fcs = document.getElementById('filter-client-status');
     if(fcs) fcs.onchange = () => { state.filter.clientStatus = fcs.value; render(); };
+    const clientSearchInput = document.getElementById('input-client-search');
+    if(clientSearchInput) clientSearchInput.oninput = () => {
+      const q = clientSearchInput.value.trim().toLowerCase();
+      const rows = document.querySelectorAll('#clients-manage-list .manage-row');
+      let visibleCount = 0;
+      rows.forEach(row => {
+        const nameEl = row.querySelector('.manage-row-name-btn');
+        const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+        const match = !q || name.includes(q);
+        row.style.display = match ? '' : 'none';
+        if(match) visibleCount++;
+      });
+      const noResults = document.getElementById('clients-no-results');
+      if(noResults) noResults.style.display = visibleCount === 0 ? '' : 'none';
+    };
     const fm = document.getElementById('filter-month');
     if(fm) fm.onchange = () => { state.filter.month = fm.value; render(); };
     document.querySelectorAll('[data-goto-tab]').forEach(btn=>{
