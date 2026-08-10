@@ -108,6 +108,7 @@ create table if not exists public.tasks (
   paid            boolean not null default false,
   raw_link         text not null default '',
   edited_link      text not null default '',
+  script_link      text not null default '',
   notes            text not null default '',
   reminder_sent_3d boolean not null default false,
   reminder_sent_2d boolean not null default false,
