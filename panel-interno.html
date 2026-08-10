@@ -1294,6 +1294,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </div>
         <div class="task-actions">
           ${ t.clientId ? `<button class="btn btn-ghost btn-sm" data-view-client="${t.clientId}">Ver cliente</button>` : '' }
+          ${ t.workflowStatus !== 'Listo' ? `<button class="btn btn-ghost btn-sm" data-mark-workflow-done="${t.id}">Completado</button>` : '' }
           ${ isAdmin ? `<button class="btn btn-ghost btn-sm" data-toggle-paid="${t.id}">${t.paid ? 'Marcar sin pagar' : 'Marcar pagado'}</button>` : '' }
           <button class="btn btn-ghost btn-sm" data-duplicate-task="${t.id}">Duplicar</button>
           <button class="btn btn-ghost btn-sm" data-edit-task="${t.id}">Editar</button>
@@ -1853,6 +1854,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-toggle-paid'));
         if(!t) return;
         const { error } = await supabase.from('tasks').update({ paid: !t.paid }).eq('id', t.id);
+        if(error) throw error;
+        await reloadData();
+        render();
+      });
+    });
+    document.querySelectorAll('[data-mark-workflow-done]').forEach(btn=>{
+      btn.onclick = () => withBusy(async () => {
+        const id = btn.getAttribute('data-mark-workflow-done');
+        const { error } = await supabase.from('tasks').update({ workflow_status: 'Listo' }).eq('id', id);
         if(error) throw error;
         await reloadData();
         render();
