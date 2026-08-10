@@ -913,7 +913,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${overdueBanner}
       ${monthFilterHtml}
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${state.clients.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${state.clients.filter(c=>c.status==='Activo').length}</div></div>
         <div class="stat-card"><div class="stat-label">Editores</div><div class="stat-value">${state.editors.length}</div></div>
         <div class="stat-card"><div class="stat-label">Videos en curso</div><div class="stat-value">${doneVideos}/${totalVideos}</div></div>
         <div class="stat-card"><div class="stat-label">Generado${selectedMonth?' (mes)':' a la fecha'}</div><div class="stat-value">${fmtMoney(generated)}</div></div>
