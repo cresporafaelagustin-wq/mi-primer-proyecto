@@ -1275,7 +1275,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     return `
       <div class="section-head"><div><span class="section-tag">04 — Equipo</span><h2 class="section-title">Editores</h2></div><button class="btn btn-primary btn-sm" id="btn-new-editor">+ Nuevo editor</button></div>
-      ${ state.editors.length===0 ? emptyState('Todavía no hay editores', 'Agregá a las personas de tu equipo para poder asignarles tareas.') : `<div class="manage-list">${rows}</div>` }
+      ${ state.editors.length > 0 ? `<div class="field" style="max-width:360px;"><input type="text" id="input-editor-search" placeholder="Buscar editor por nombre..."></div>` : '' }
+      ${ state.editors.length===0 ? emptyState('Todavía no hay editores', 'Agregá a las personas de tu equipo para poder asignarles tareas.') : `
+      <div class="manage-list" id="editors-manage-list">${rows}</div>
+      <div id="editors-no-results" style="display:none;">${emptyState('Ningún editor coincide', 'Probá con otro nombre o borrá el buscador.')}</div>` }
     `;
   }
 
@@ -1573,6 +1576,21 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         if(match) visibleCount++;
       });
       const noResults = document.getElementById('clients-no-results');
+      if(noResults) noResults.style.display = visibleCount === 0 ? '' : 'none';
+    };
+    const editorSearchInput = document.getElementById('input-editor-search');
+    if(editorSearchInput) editorSearchInput.oninput = () => {
+      const q = editorSearchInput.value.trim().toLowerCase();
+      const rows = document.querySelectorAll('#editors-manage-list .manage-row');
+      let visibleCount = 0;
+      rows.forEach(row => {
+        const nameEl = row.querySelector('.name');
+        const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+        const match = !q || name.includes(q);
+        row.style.display = match ? '' : 'none';
+        if(match) visibleCount++;
+      });
+      const noResults = document.getElementById('editors-no-results');
       if(noResults) noResults.style.display = visibleCount === 0 ? '' : 'none';
     };
     const fm = document.getElementById('filter-month');
