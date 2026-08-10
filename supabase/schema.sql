@@ -103,6 +103,7 @@ create table if not exists public.tasks (
   video_count     integer not null default 0,
   videos_done     integer not null default 0,
   priority        text not null default 'media' check (priority in ('alta','media','baja')),
+  workflow_status text not null default 'Sin editar' check (workflow_status in ('Sin editar','Editando','Revisión','Listo')),
   deadline        date,
   price_per_video numeric not null default 0,
   paid            boolean not null default false,

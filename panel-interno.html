@@ -342,6 +342,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   const CLIENT_STATUSES = ['Activo','Baja/Cancelado','Casi-Cerrado','En Espera/Congelado','En Negociación','En Seguimiento (Post-Servicio)','Hacer seguimiento'];
   const CLIENT_PAYMENT_STATUSES = ['Al día','Debe','No paga'];
+  const TASK_WORKFLOW_STATUSES = ['Sin editar','Editando','Revisión','Listo'];
 
   let state = {
     ready: false,
@@ -359,7 +360,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     currentUser: null,
     login: { step: 'request', email: '', code: '', error: '', loading: false },
     activeTab: 'resumen',
-    filter: { editorId:'', clientId:'', status:'', priority:'', clientStatus:'', month:'' },
+    filter: { editorId:'', clientId:'', status:'', priority:'', workflowStatus:'', clientStatus:'', month:'' },
     clientDetailId: null,
     viewAsEditorId: null,
     previewReturnTab: null,
@@ -442,7 +443,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return {
       id: r.id, project: r.project, clientId: r.client_id || '', editorId: r.editor_id || '',
       videoCount: Number(r.video_count)||0, videosDone: Number(r.videos_done)||0,
-      priority: r.priority || 'media', deadline: r.deadline || '', pricePerVideo: Number(r.price_per_video)||0,
+      priority: r.priority || 'media', workflowStatus: r.workflow_status || 'Sin editar',
+      deadline: r.deadline || '', pricePerVideo: Number(r.price_per_video)||0,
       paid: !!r.paid, rawLink: r.raw_link || '', editedLink: r.edited_link || '',
       scriptLink: r.script_link || '', notes: r.notes || ''
     };
@@ -451,6 +453,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return {
       project: t.project, client_id: t.clientId || null, editor_id: t.editorId || null,
       video_count: t.videoCount, videos_done: t.videosDone, priority: t.priority || 'media',
+      workflow_status: t.workflowStatus || 'Sin editar',
       deadline: t.deadline || null, price_per_video: t.pricePerVideo, paid: !!t.paid,
       raw_link: t.rawLink || '', edited_link: t.editedLink || '', script_link: t.scriptLink || '',
       notes: t.notes || ''
@@ -1174,6 +1177,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       if(state.filter.clientId) tasks = tasks.filter(t=>t.clientId===state.filter.clientId);
       if(state.filter.status) tasks = tasks.filter(t=>taskStatus(t)===state.filter.status);
       if(state.filter.priority) tasks = tasks.filter(t=>(t.priority||'media')===state.filter.priority);
+      if(state.filter.workflowStatus) tasks = tasks.filter(t=>(t.workflowStatus||'Sin editar')===state.filter.workflowStatus);
     }
     tasks.sort((a,b)=>{
       const pa = priorityRank(a.priority), pb = priorityRank(b.priority);
@@ -1197,6 +1201,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           <option value="alta" ${state.filter.priority==='alta'?'selected':''}>Alta</option>
           <option value="media" ${state.filter.priority==='media'?'selected':''}>Media</option>
           <option value="baja" ${state.filter.priority==='baja'?'selected':''}>Baja</option>
+        </select>
+        <select id="filter-workflow">
+          <option value="">Todos los estados de edición</option>
+          ${TASK_WORKFLOW_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${state.filter.workflowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
         </select>
       </div>` : '';
 
@@ -1240,6 +1248,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="task-meta">
         <span>Entrega <span class="mono">${fmtDate(t.deadline)}</span></span>
         <span>Precio/video <span class="mono">${fmtMoney(t.pricePerVideo)}</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Estado de edición</label>
+        <select data-workflow-id="${t.id}">
+          ${TASK_WORKFLOW_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${t.workflowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+        </select>
       </div>
 
       <div>
@@ -1601,6 +1616,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(fc) fc.onchange = () => { state.filter.clientId = fc.value; render(); };
     if(fs) fs.onchange = () => { state.filter.status = fs.value; render(); };
     if(fp) fp.onchange = () => { state.filter.priority = fp.value; render(); };
+    const fw = document.getElementById('filter-workflow');
+    if(fw) fw.onchange = () => { state.filter.workflowStatus = fw.value; render(); };
     const fcs = document.getElementById('filter-client-status');
     if(fcs) fcs.onchange = () => { state.filter.clientStatus = fcs.value; render(); };
     const clientSearchInput = document.getElementById('input-client-search');
@@ -1826,7 +1843,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-duplicate-task'));
         if(!t) return;
         const restrictEditorId = isPreviewMode() ? state.viewAsEditorId : (state.currentUser.type === 'editor' ? state.currentUser.id : null);
-        const seed = { ...t, videosDone: 0, paid: false, rawLink: '', editedLink: '' };
+        const seed = { ...t, videosDone: 0, paid: false, rawLink: '', editedLink: '', scriptLink: '', workflowStatus: 'Sin editar' };
         state.modal = { kind:'task', data: null, restrictEditorId, seed };
         render();
       };
@@ -1884,6 +1901,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         const t = state.tasks.find(x=>x.id===input.getAttribute('data-progress-id'));
         if(!t) return;
         const { error } = await supabase.from('tasks').update({ videos_done: t.videosDone }).eq('id', t.id);
+        if(error) throw error;
+        await reloadData();
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-workflow-id]').forEach(select=>{
+      select.onchange = () => withBusy(async () => {
+        const id = select.getAttribute('data-workflow-id');
+        const { error } = await supabase.from('tasks').update({ workflow_status: select.value }).eq('id', id);
         if(error) throw error;
         await reloadData();
         render();
@@ -2167,6 +2194,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="field-row">
         <div class="field"><label class="field-label">Fecha de entrega</label><input type="date" id="input-task-deadline" value="${src?src.deadline||'':''}"></div>
         <div class="field"><label class="field-label">Precio por video (a favor del editor)</label><input type="number" min="0" step="0.01" id="input-task-price" value="${src?src.pricePerVideo:0}"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Estado de edición</label>
+        <select id="input-task-workflow">
+          ${TASK_WORKFLOW_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${src&&src.workflowStatus===s?'selected':(!src&&s==='Sin editar'?'selected':'')}>${escapeHtml(s)}</option>`).join('')}
+        </select>
       </div>
       <div class="field-row">
         <div class="field"><label class="field-label">Videos completados</label><input type="number" min="0" id="input-task-done" value="${src?src.videosDone:0}"></div>
@@ -2484,6 +2517,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         editorId: document.getElementById('input-task-editor').value,
         videoCount: Number(document.getElementById('input-task-count').value) || 0,
         priority: document.getElementById('input-task-priority').value || 'media',
+        workflowStatus: document.getElementById('input-task-workflow').value || 'Sin editar',
         deadline: document.getElementById('input-task-deadline').value,
         pricePerVideo: Number(document.getElementById('input-task-price').value) || 0,
         videosDone: Number(document.getElementById('input-task-done').value) || 0,
