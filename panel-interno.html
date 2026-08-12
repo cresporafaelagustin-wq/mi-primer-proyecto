@@ -194,6 +194,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .filter-bar select:last-child{ border-right:none; }
 .filter-bar select:focus{ outline:none; }
 
+/* ============ KANBAN BOARD (por estado de edición) ============ */
+.kanban-board{ display:flex; gap:16px; align-items:flex-start; overflow-x:auto; padding-bottom:10px; }
+.kanban-column{ flex:1 1 300px; min-width:280px; max-width:360px; display:flex; flex-direction:column; gap:14px; }
+.kanban-col-head{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid var(--ink); padding-bottom:10px; margin-bottom:2px; }
+.kanban-col-title{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink); }
+.kanban-col-count{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-soft); }
+.kanban-empty{ border:1px dashed var(--paper-line); padding:24px 14px; text-align:center; font-size:12px; color:var(--ink-soft); }
+
 /* ============ TASK GRID / CARDS ============ */
 .task-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; }
 .task-list{ display:flex; flex-direction:column; gap:14px; }
@@ -1230,14 +1238,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderTareas(isAdmin){
-    let tasks = state.tasks.filter(t=>t.workflowStatus !== 'Listo'); // completadas viven en Archivo
+    let tasks = state.tasks.slice();
     if(!isAdmin){ tasks = tasks.filter(t=>t.editorId===effectiveEditorId()); }
     else {
       if(state.filter.editorId) tasks = tasks.filter(t=>t.editorId===state.filter.editorId);
       if(state.filter.clientId) tasks = tasks.filter(t=>t.clientId===state.filter.clientId);
       if(state.filter.status) tasks = tasks.filter(t=>taskStatus(t)===state.filter.status);
       if(state.filter.priority) tasks = tasks.filter(t=>(t.priority||'media')===state.filter.priority);
-      if(state.filter.workflowStatus) tasks = tasks.filter(t=>(t.workflowStatus||'Sin editar')===state.filter.workflowStatus);
     }
     tasks.sort((a,b)=>{
       const pa = priorityRank(a.priority), pb = priorityRank(b.priority);
@@ -1262,14 +1269,22 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           <option value="media" ${state.filter.priority==='media'?'selected':''}>Media</option>
           <option value="baja" ${state.filter.priority==='baja'?'selected':''}>Baja</option>
         </select>
-        <select id="filter-workflow">
-          <option value="">Todos los estados de edición</option>
-          ${TASK_WORKFLOW_STATUSES.filter(s=>s!=='Listo').map(s=>`<option value="${escapeHtml(s)}" ${state.filter.workflowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
-        </select>
       </div>` : '';
 
     const addBtn = `<button class="btn btn-primary btn-sm" id="btn-new-task">+ Nueva tarea</button>`;
-    const cards = tasks.map(t => renderTaskCard(t, isAdmin)).join('');
+
+    const columnsHtml = TASK_WORKFLOW_STATUSES.map(status=>{
+      const colTasks = tasks.filter(t=>(t.workflowStatus||'Sin editar')===status);
+      const cards = colTasks.map(t=>renderTaskCard(t, isAdmin)).join('');
+      return `
+        <div class="kanban-column">
+          <div class="kanban-col-head">
+            <span class="kanban-col-title">${escapeHtml(status)}</span>
+            <span class="kanban-col-count">${colTasks.length}</span>
+          </div>
+          ${ colTasks.length === 0 ? `<div class="kanban-empty">Sin tareas</div>` : cards }
+        </div>`;
+    }).join('');
 
     return `
       <div class="section-head">
@@ -1280,7 +1295,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${ tasks.length === 0 ? emptyState(
           isAdmin ? 'No hay tareas todavía' : 'Todavía no tenés tareas asignadas',
           isAdmin ? 'Creá una tarea y asignala a un editor y un cliente.' : 'Tu administrador te va a asignar proyectos acá.'
-        ) : `<div class="task-list">${cards}</div>` }
+        ) : `<div class="kanban-board">${columnsHtml}</div>` }
     `;
   }
 
