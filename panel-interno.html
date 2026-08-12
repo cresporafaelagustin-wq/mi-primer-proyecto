@@ -20,6 +20,8 @@
 
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
+html{ transition:filter .15s ease; }
+html.inverted{ filter:invert(1) hue-rotate(180deg); }
 body{
   background: var(--paper);
   color: var(--ink);
@@ -201,6 +203,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .kanban-col-title{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink); }
 .kanban-col-count{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-soft); }
 .kanban-empty{ border:1px dashed var(--paper-line); padding:24px 14px; text-align:center; font-size:12px; color:var(--ink-soft); }
+.kanban-column{ gap:8px; }
+.kanban-card{
+  display:block; width:100%; text-align:left; background:var(--paper); border:1px solid var(--paper-line);
+  padding:14px 16px; font-family:'Playfair Display', serif; font-weight:600; font-size:14.5px; color:var(--ink);
+  cursor:pointer; transition:border-color .12s, background .12s;
+}
+.kanban-card:hover{ border-color:var(--ink); background:var(--paper-line); }
+
+/* ============ MODAL DE DETALLE DE TAREA ============ */
+.task-detail-inner .task-card{ border:none; padding:0; gap:16px; }
 
 /* ============ TASK GRID / CARDS ============ */
 .task-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; }
@@ -372,7 +384,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     clientDetailId: null,
     viewAsEditorId: null,
     previewReturnTab: null,
-    modal: null
+    modal: null,
+    inverted: localStorage.getItem('sca_inverted') === '1'
   };
 
   const app = document.getElementById('app');
@@ -650,6 +663,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function render(){
+    document.documentElement.classList.toggle('inverted', !!state.inverted);
     if(!state.ready){
       app.innerHTML = '<div class="login-screen"><p class="empty-note">Cargando panel…</p></div>';
       return;
@@ -789,6 +803,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           <div class="user-badge"><span class="user-dot"></span><span class="sidebar-hide-label">${escapeHtml(userLabel)}</span></div>
           ${ isAdmin ? `<button class="btn btn-ghost btn-sm sidebar-btn" id="btn-export-data" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">↓</span><span class="sidebar-hide-label">Exportar datos</span></button>` : '' }
           ${ isAdmin ? `<button class="btn btn-ghost btn-sm sidebar-btn" id="btn-import-backup" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">↑</span><span class="sidebar-hide-label">Importar backup</span></button>` : '' }
+          <button class="btn btn-ghost btn-sm sidebar-btn" id="btn-toggle-invert" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">◐</span><span class="sidebar-hide-label">${state.inverted ? 'Colores normales' : 'Invertir colores'}</span></button>
           <button class="btn btn-ghost btn-sm sidebar-btn" id="btn-logout" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">×</span><span class="sidebar-hide-label">Salir</span></button>
         </div>
       </aside>
@@ -820,6 +835,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(exportBtn) exportBtn.onclick = exportData;
     const importBtn = document.getElementById('btn-import-backup');
     if(importBtn) importBtn.onclick = () => { state.modal = { kind:'import-backup' }; render(); };
+    const invertBtn = document.getElementById('btn-toggle-invert');
+    if(invertBtn) invertBtn.onclick = () => {
+      state.inverted = !state.inverted;
+      localStorage.setItem('sca_inverted', state.inverted ? '1' : '0');
+      render();
+    };
     document.querySelectorAll('.tab-btn').forEach(btn=>{ btn.onclick = () => { state.activeTab = btn.getAttribute('data-tab'); render(); }; });
     attachContentEvents();
   }
@@ -1275,7 +1296,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     const columnsHtml = TASK_WORKFLOW_STATUSES.map(status=>{
       const colTasks = tasks.filter(t=>(t.workflowStatus||'Sin editar')===status);
-      const cards = colTasks.map(t=>renderTaskCard(t, isAdmin)).join('');
+      const cards = colTasks.map(t=>renderTaskKanbanCard(t, isAdmin)).join('');
       return `
         <div class="kanban-column">
           <div class="kanban-col-head">
@@ -1342,6 +1363,31 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${filterBar}
       ${ tasks.length === 0 ? emptyState('Todavía no hay tareas archivadas', 'Cuando marqués una tarea como "Listo" o toqués "Completado", se va a guardar acá agrupada por mes.') : groupsHtml }
     `;
+  }
+
+  function renderTaskKanbanCard(t, isAdmin){
+    return `<button type="button" class="kanban-card" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}</button>`;
+  }
+
+  function renderTaskDetailModal(id, isAdmin){
+    const t = state.tasks.find(x=>x.id===id);
+    if(!t){
+      return `
+      <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+        <h3>Tarea no encontrada</h3>
+        <p class="goal-message">Puede que se haya eliminado.</p>
+        <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cerrar</button></div>
+      </div></div>`;
+    }
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal" style="max-width:640px;">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+          <button class="btn btn-ghost btn-sm" id="btn-cancel-modal">Cerrar</button>
+        </div>
+        <div class="task-detail-inner">${renderTaskCard(t, isAdmin)}</div>
+      </div>
+    </div>`;
   }
 
   function renderTaskCard(t, isAdmin){
@@ -1937,7 +1983,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       };
     });
     document.querySelectorAll('[data-view-client]').forEach(btn=>{
-      btn.onclick = () => { state.clientDetailId = btn.getAttribute('data-view-client'); render(); };
+      btn.onclick = () => { state.clientDetailId = btn.getAttribute('data-view-client'); state.modal = null; render(); };
+    });
+    document.querySelectorAll('[data-open-task]').forEach(btn=>{
+      btn.onclick = () => {
+        state.modal = { kind:'task-detail', id: btn.getAttribute('data-open-task'), isAdmin: btn.getAttribute('data-open-task-admin')==='1' };
+        render();
+      };
     });
     const backToClientsBtn = document.getElementById('btn-back-to-clients');
     if(backToClientsBtn) backToClientsBtn.onclick = () => { state.clientDetailId = null; render(); };
@@ -2074,6 +2126,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(m.kind === 'editor') return renderEditorModal(m.data);
     if(m.kind === 'client') return renderClientModal(m.data);
     if(m.kind === 'task') return renderTaskModal(m.data, m.restrictEditorId, m.seed);
+    if(m.kind === 'task-detail') return renderTaskDetailModal(m.id, m.isAdmin);
     if(m.kind === 'confirm') return renderConfirmModal(m.message);
     if(m.kind === 'import-clients') return renderImportClientsModal();
     if(m.kind === 'import-backup') return renderImportBackupModal();
