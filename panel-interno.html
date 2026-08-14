@@ -179,6 +179,19 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .stat-card{ background:var(--ink); color:var(--cream); padding:20px 20px; }
 .stat-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(245,244,239,0.55); margin-bottom:10px; }
 .stat-value{ font-size:23px; font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--cream); }
+.stat-card[data-tooltip]{ position:relative; cursor:help; }
+.stat-card[data-tooltip] .stat-label{ text-decoration:underline dotted; text-decoration-color:rgba(245,244,239,0.4); text-underline-offset:3px; }
+.stat-card[data-tooltip]::after{
+  content: attr(data-tooltip);
+  position:absolute; left:0; top:100%; margin-top:8px; z-index:40;
+  background:var(--cream); color:var(--ink); border:1px solid var(--ink);
+  padding:11px 13px; font-size:12px; line-height:1.5; font-family:'Inter',sans-serif;
+  font-weight:400; text-transform:none; letter-spacing:normal;
+  width:230px; max-width:70vw; white-space:normal;
+  opacity:0; visibility:hidden; pointer-events:none;
+  transition: opacity .12s ease;
+}
+.stat-card[data-tooltip]:hover::after{ opacity:1; visibility:visible; }
 
 /* ============ DATA TABLE ============ */
 .data-table{ width:100%; border-collapse:collapse; background:var(--paper); border:1px solid var(--paper-line); }
@@ -633,6 +646,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   /* ================= HELPERS ================= */
   function fmtMoney(n){ if(isNaN(n)) n=0; return '$' + Number(n).toLocaleString('es-AR', {maximumFractionDigits:2}); }
+  function statCard(label, valueHtml, tooltip){
+    return `<div class="stat-card"${tooltip ? ` data-tooltip="${escapeHtml(tooltip)}"` : ''}><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${valueHtml}</div></div>`;
+  }
   function fmtDate(d){
     if(!d) return '—';
     const dt = new Date(d + 'T00:00:00');
@@ -1701,17 +1717,17 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${ isAdmin ? `
       <div class="section-head"><div><span class="section-tag">Solo admin</span><h2 class="section-title">Finanzas</h2></div><button class="btn btn-ghost btn-sm" data-edit-client-finance="${client.id}">Editar finanzas</button></div>
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-label">Pago</div><div class="stat-value" style="font-size:15px;">${client.paymentStatus ? escapeHtml(client.paymentStatus) : 'Sin estado'}</div></div>
-        <div class="stat-card"><div class="stat-label">Total a cobrar</div><div class="stat-value">${fmtMoney(client.totalCharge)}</div></div>
-        <div class="stat-card"><div class="stat-label">Cobrado</div><div class="stat-value">${fmtMoney(client.totalIncome)}</div></div>
-        <div class="stat-card"><div class="stat-label">Debe</div><div class="stat-value">${fmtMoney(client.amountOwed)}</div></div>
-        <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(clientEditingCost(client.id))}</div></div>
-        <div class="stat-card"><div class="stat-label">Costo edición (proyectado)</div><div class="stat-value">${fmtMoney(clientEditingCostProjected(client.id))}</div></div>
-        <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(client.gatewayFee)}</div></div>
-        <div class="stat-card"><div class="stat-label">Comisión referido</div><div class="stat-value">${fmtMoney(clientReferrerCommissionAmount(client))}</div></div>
-        <div class="stat-card"><div class="stat-label">Ganancia neta</div><div class="stat-value">${fmtMoney(clientNetProfit(client))}</div></div>
-        <div class="stat-card"><div class="stat-label">Neta sin pagar edición pendiente</div><div class="stat-value">${fmtMoney(clientNetProfitBeforePayingEditing(client))}</div></div>
-        <div class="stat-card"><div class="stat-label">Ganancia neta (proyectada)</div><div class="stat-value">${fmtMoney(clientNetProfitProjected(client))}</div></div>
+        <div class="stat-card" data-tooltip="Estado de pago que cargaste para este cliente desde Editar finanzas."><div class="stat-label">Pago</div><div class="stat-value" style="font-size:15px;">${client.paymentStatus ? escapeHtml(client.paymentStatus) : 'Sin estado'}</div></div>
+        ${statCard('Total a cobrar', fmtMoney(client.totalCharge), 'Lo que le cobrás a este cliente en total.')}
+        ${statCard('Cobrado', fmtMoney(client.totalIncome), 'Lo que este cliente ya te pagó hasta ahora.')}
+        ${statCard('Debe', fmtMoney(client.amountOwed), 'Total a cobrar menos lo cobrado — se calcula solo, no se carga a mano.')}
+        ${statCard('Costo edición', fmtMoney(clientEditingCost(client.id)), 'Lo que ya generaron los editores en los videos completados de este cliente.')}
+        ${statCard('Costo edición (proyectado)', fmtMoney(clientEditingCostProjected(client.id)), 'Lo que se le va a terminar pagando al editor si se completa todo lo asignado a este cliente, aunque todavía no esté hecho.')}
+        ${statCard('Comisión pasarela', fmtMoney(client.gatewayFee), 'Lo que se queda la plataforma de cobro (Mercado Pago, PayPal, etc.) de este cliente.')}
+        ${statCard('Comisión referido', fmtMoney(clientReferrerCommissionAmount(client)), 'Lo que le corresponde al referente de este cliente, según el % configurado.')}
+        ${statCard('Ganancia neta', fmtMoney(clientNetProfit(client)), 'Cobrado menos costo de edición ya generado, comisión de pasarela y comisión de referido.')}
+        ${statCard('Neta sin pagar edición pendiente', fmtMoney(clientNetProfitBeforePayingEditing(client)), 'Cuánto quedaría si todavía no le pagaste al editor lo que ya generó pero sigue pendiente de pago en este cliente.')}
+        ${statCard('Ganancia neta (proyectada)', fmtMoney(clientNetProfitProjected(client)), 'Ganancia final estimada si todo lo asignado a este cliente se completa y se cobra/paga.')}
       </div>
       <div class="goal-box" style="margin-bottom:34px;">
         <div class="task-meta">
@@ -1961,14 +1977,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
 
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-label">Ingresos totales</div><div class="stat-value">${fmtMoney(totalIncome)}</div></div>
-        <div class="stat-card"><div class="stat-label">Total a guardar</div><div class="stat-value">${fmtMoney(totalToHold)}</div></div>
-        <div class="stat-card"><div class="stat-label">Ganancia líquida</div><div class="stat-value">${fmtMoney(netProfit)}</div></div>
-        <div class="stat-card"><div class="stat-label">Líquida sin pagar edición pendiente</div><div class="stat-value">${fmtMoney(netProfitBeforePayingEditing)}</div></div>
-        <div class="stat-card"><div class="stat-label">Costo edición (proyectado)</div><div class="stat-value">${fmtMoney(totalEditingCostProjected)}</div></div>
-        <div class="stat-card"><div class="stat-label">Ganancia líquida (proyectada)</div><div class="stat-value">${fmtMoney(netProfitProjected)}</div></div>
-        <div class="stat-card"><div class="stat-label">Tu parte (${ownerPct}%)</div><div class="stat-value">${fmtMoney(ownerShare)}</div></div>
-        <div class="stat-card"><div class="stat-label">Fondo de reserva</div><div class="stat-value">${fmtMoney(reserveShare)}</div></div>
+        ${statCard('Ingresos totales', fmtMoney(totalIncome), 'Suma de lo cobrado hasta ahora a todos los clientes.')}
+        ${statCard('Total a guardar', fmtMoney(totalToHold), 'Lo que hay que reservar: costo de edición ya generado + comisiones de referentes + comisiones de pasarela + gastos fijos.')}
+        ${statCard('Ganancia líquida', fmtMoney(netProfit), 'Ingresos totales menos el total a guardar. Lo que queda una vez cubierto todo lo generado hasta hoy.')}
+        ${statCard('Líquida sin pagar edición pendiente', fmtMoney(netProfitBeforePayingEditing), 'Cuánto quedaría en mano si todavía no les pagaste a los editores lo que ya generaron pero sigue pendiente de pago.')}
+        ${statCard('Costo edición (proyectado)', fmtMoney(totalEditingCostProjected), 'Lo que se les va a terminar pagando a los editores por todas las tareas asignadas, aunque todavía no estén completadas.')}
+        ${statCard('Ganancia líquida (proyectada)', fmtMoney(netProfitProjected), 'Ganancia final estimada si todo lo asignado a todos los clientes se completa y se cobra/paga.')}
+        ${statCard(`Tu parte (${ownerPct}%)`, fmtMoney(ownerShare), 'Tu porcentaje de la ganancia líquida, según el reparto configurado arriba.')}
+        ${statCard('Fondo de reserva', fmtMoney(reserveShare), 'El resto de la ganancia líquida (100% menos tu parte), que queda como reserva de la empresa.')}
       </div>
 
       <div class="section-head"><div><span class="section-tag">Reparto</span><h2 class="section-title">¿En qué se va la plata?</h2></div></div>
