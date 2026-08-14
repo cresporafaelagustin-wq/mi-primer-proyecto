@@ -1675,6 +1675,34 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </tr>
     `).join('');
 
+    const monthGroups = new Map();
+    myTasks.forEach(t=>{
+      const key = monthKey(t.deadline) || 'sin-fecha';
+      if(!monthGroups.has(key)) monthGroups.set(key, { tasks:0, videos:0, generated:0, paid:0 });
+      const g = monthGroups.get(key);
+      g.tasks += 1;
+      g.videos += Number(t.videosDone||0);
+      g.generated += Number(t.videosDone||0)*Number(t.pricePerVideo||0);
+      g.paid += taskPaidAmount(t);
+    });
+    const monthKeys = [...monthGroups.keys()].sort((a,b)=>{
+      if(a==='sin-fecha') return 1;
+      if(b==='sin-fecha') return -1;
+      return b.localeCompare(a); // más reciente primero
+    });
+    const monthRows = monthKeys.map(key=>{
+      const g = monthGroups.get(key);
+      const label = key==='sin-fecha' ? 'Sin fecha de entrega' : monthLabel(key);
+      return `
+      <tr>
+        <td>${escapeHtml(label)}</td>
+        <td class="mono">${g.tasks}</td>
+        <td class="mono">${g.videos}</td>
+        <td class="mono">${fmtMoney(g.generated)}</td>
+        <td class="mono">${fmtMoney(g.paid)}</td>
+      </tr>`;
+    }).join('');
+
     return `
       <button class="btn btn-ghost btn-sm" id="btn-back-to-editors" style="margin-bottom:22px;">← Volver</button>
 
@@ -1696,6 +1724,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="stat-card"><div class="stat-label">Pagado</div><div class="stat-value">${fmtMoney(paidAmount)}</div></div>
         <div class="stat-card"><div class="stat-label">Sin pagar</div><div class="stat-value">${fmtMoney(earned - paidAmount)}</div></div>
       </div>
+
+      <div class="section-head"><div><span class="section-tag">Producción</span><h2 class="section-title">Resumen mensual</h2></div></div>
+      ${ monthKeys.length === 0 ? emptyState('Todavía no hay datos', 'Cuando este editor tenga tareas con videos completados, el resumen mes a mes va a aparecer acá.') : `
+      <table class="data-table" style="margin-bottom:34px;">
+        <thead><tr><th>Mes</th><th>Tareas</th><th>Videos editados</th><th>Generado</th><th>Pagado</th></tr></thead>
+        <tbody>${monthRows}</tbody>
+      </table>` }
 
       <div class="section-head"><div><span class="section-tag">Meta</span><h2 class="section-title">Proyección de ingresos</h2></div></div>
       ${ renderGoalWidget(editor, myTasks, false) }
