@@ -391,6 +391,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     activeTab: 'resumen',
     filter: { editorId:'', clientId:'', status:'', priority:'', workflowStatus:'', clientStatus:'', month:'' },
     clientDetailId: null,
+    editorDetailId: null,
     viewAsEditorId: null,
     previewReturnTab: null,
     modal: null,
@@ -922,6 +923,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const detailClient = state.clients.find(c=>c.id===state.clientDetailId);
       if(detailClient) return renderClientProfile(detailClient, isAdmin && !isPreviewMode());
       state.clientDetailId = null; // cliente eliminado u otro id inválido
+    }
+    if(state.editorDetailId){
+      const detailEditor = state.editors.find(e=>e.id===state.editorDetailId);
+      if(detailEditor) return renderEditorProfile(detailEditor, isAdmin && !isPreviewMode());
+      state.editorDetailId = null; // editor eliminado u otro id inválido
     }
     if(isAdmin && isPreviewMode()){
       const ed = state.editors.find(e=>e.id===state.viewAsEditorId);
@@ -1500,7 +1506,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="manage-row-main">
           ${avatarMark(e.name)}
           <div>
-            <div class="name">${escapeHtml(e.name)}</div>
+            <button class="manage-row-name-btn" data-view-editor="${e.id}">${escapeHtml(e.name)}</button>
             <div class="sub">${n} tarea${n===1?'':'s'} asignada${n===1?'':'s'} · ${videosRemaining} video${videosRemaining===1?'':'s'} por hacer · ${fmtMoney(earned)} generado${ e.email ? ' · ' + escapeHtml(e.email) : ' · sin email (no puede iniciar sesión)' }</div>
           </div>
         </div>
@@ -1640,6 +1646,78 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       ${ clientTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se cree una tarea para este cliente, va a aparecer acá.') : `
       <table class="data-table">
         <thead><tr><th>Proyecto</th><th>Editor</th><th>Estado</th><th>Entrega</th></tr></thead>
+        <tbody>${taskRows}</tbody>
+      </table>` }
+    `;
+  }
+
+  function renderEditorProfile(editor, isAdmin){
+    const myTasks = state.tasks.filter(t=>t.editorId===editor.id);
+    const pendingTasks = myTasks.filter(t=>t.workflowStatus !== 'Listo');
+    const videosRemaining = myTasks.reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
+    const videosDone = myTasks.reduce((s,t)=>s+Number(t.videosDone||0),0);
+    const earned = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+    const paidAmount = myTasks.reduce((s,t)=>s+taskPaidAmount(t),0);
+
+    const linkRow = (label, url) => `
+      <div class="link-row">
+        <span class="field-label-inline">${escapeHtml(label)}</span>
+        ${ url ? `<a class="open-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : `<span style="color:var(--ink-soft); font-size:12.5px;">Sin cargar</span>` }
+      </div>`;
+
+    const taskRows = myTasks.map(t=>`
+      <tr>
+        <td>${escapeHtml(t.project)}</td>
+        <td>${escapeHtml(clientName(t.clientId))}</td>
+        <td>${statusLabel(taskStatus(t))}</td>
+        <td>${escapeHtml(t.workflowStatus||'Sin editar')}</td>
+        <td class="mono">${fmtDate(t.deadline)}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <button class="btn btn-ghost btn-sm" id="btn-back-to-editors" style="margin-bottom:22px;">← Volver</button>
+
+      <div class="section-head">
+        <div><span class="section-tag">Ficha de editor</span><h2 class="section-title">${escapeHtml(editor.name)}</h2></div>
+        ${ isAdmin ? `
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-view-as-editor="${editor.id}">Ver como</button>
+          <button class="btn btn-ghost btn-sm" data-edit-editor="${editor.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-delete-editor="${editor.id}">Eliminar</button>
+        </div>` : '' }
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Tareas pendientes</div><div class="stat-value">${pendingTasks.length}</div></div>
+        <div class="stat-card"><div class="stat-label">Videos por hacer</div><div class="stat-value">${videosRemaining}</div></div>
+        <div class="stat-card"><div class="stat-label">Videos completados</div><div class="stat-value">${videosDone}</div></div>
+        <div class="stat-card"><div class="stat-label">Generado</div><div class="stat-value">${fmtMoney(earned)}</div></div>
+        <div class="stat-card"><div class="stat-label">Pagado</div><div class="stat-value">${fmtMoney(paidAmount)}</div></div>
+        <div class="stat-card"><div class="stat-label">Sin pagar</div><div class="stat-value">${fmtMoney(earned - paidAmount)}</div></div>
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">Meta</span><h2 class="section-title">Proyección de ingresos</h2></div></div>
+      ${ renderGoalWidget(editor, myTasks, false) }
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Contacto</span><h2 class="section-title">Enlaces y avisos</h2></div></div>
+      <div class="goal-box" style="margin-bottom:34px;">
+        <div class="task-links">
+          ${linkRow('Tracker', editor.trackerLink)}
+        </div>
+        ${ isAdmin ? `
+        <div class="task-meta" style="margin-top:14px;">
+          <span>Login <span class="mono">${editor.email ? escapeHtml(editor.email) : 'sin email'}</span></span>
+          <span>Email de avisos <span class="mono">${editor.notificationEmail ? escapeHtml(editor.notificationEmail) : 'sin cargar'}</span></span>
+          <span>WhatsApp <span class="mono">${editor.notificationPhone ? escapeHtml(editor.notificationPhone) : 'sin cargar'}</span></span>
+          <span>Cuenta de pago <span class="mono">${editor.payoutAccountId ? escapeHtml(paymentAccountName(editor.payoutAccountId)) : 'sin asignar'}</span></span>
+        </div>` : '' }
+      </div>
+
+      <div class="section-head"><div><span class="section-tag">Historial</span><h2 class="section-title">Tareas de ${escapeHtml(editor.name)}</h2></div></div>
+      ${ myTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se le asigne una tarea a este editor, va a aparecer acá.') : `
+      <table class="data-table">
+        <thead><tr><th>Proyecto</th><th>Cliente</th><th>Estado</th><th>Edición</th><th>Entrega</th></tr></thead>
         <tbody>${taskRows}</tbody>
       </table>` }
     `;
@@ -1828,7 +1906,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const rows = document.querySelectorAll('#editors-manage-list .manage-row');
       let visibleCount = 0;
       rows.forEach(row => {
-        const nameEl = row.querySelector('.name');
+        const nameEl = row.querySelector('.manage-row-name-btn');
         const name = nameEl ? nameEl.textContent.toLowerCase() : '';
         const match = !q || name.includes(q);
         row.style.display = match ? '' : 'none';
@@ -1985,6 +2063,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         state.viewAsEditorId = btn.getAttribute('data-view-as-editor');
         state.previewReturnTab = state.activeTab;
         state.activeTab = 'resumen';
+        state.clientDetailId = null;
+        state.editorDetailId = null;
         render();
       };
     });
@@ -2005,6 +2085,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     document.querySelectorAll('[data-view-client]').forEach(btn=>{
       btn.onclick = () => { state.clientDetailId = btn.getAttribute('data-view-client'); state.modal = null; render(); };
     });
+    document.querySelectorAll('[data-view-editor]').forEach(btn=>{
+      btn.onclick = () => { state.editorDetailId = btn.getAttribute('data-view-editor'); state.modal = null; render(); };
+    });
     document.querySelectorAll('[data-open-task]').forEach(btn=>{
       btn.onclick = () => {
         state.modal = { kind:'task-detail', id: btn.getAttribute('data-open-task'), isAdmin: btn.getAttribute('data-open-task-admin')==='1' };
@@ -2013,6 +2096,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     });
     const backToClientsBtn = document.getElementById('btn-back-to-clients');
     if(backToClientsBtn) backToClientsBtn.onclick = () => { state.clientDetailId = null; render(); };
+    const backToEditorsBtn = document.getElementById('btn-back-to-editors');
+    if(backToEditorsBtn) backToEditorsBtn.onclick = () => { state.editorDetailId = null; render(); };
     document.querySelectorAll('[data-assign-status]').forEach(btn=>{
       btn.onclick = () => {
         const c = state.clients.find(x=>x.id===btn.getAttribute('data-assign-status'));
