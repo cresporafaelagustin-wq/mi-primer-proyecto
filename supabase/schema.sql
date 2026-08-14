@@ -107,7 +107,6 @@ create table if not exists public.tasks (
   workflow_status text not null default 'Sin editar' check (workflow_status in ('Sin editar','Editando','Revisión','Listo')),
   deadline        date,
   price_per_video numeric not null default 0,
-  client_price_per_video numeric not null default 0,
   paid            boolean not null default false,
   raw_link         text not null default '',
   edited_link      text not null default '',
@@ -118,6 +117,15 @@ create table if not exists public.tasks (
   reminder_sent_2d boolean not null default false,
   reminder_sent_1d boolean not null default false,
   created_at       timestamptz not null default now()
+);
+
+-- Precio de venta al cliente por video: aparte de tasks por el mismo motivo
+-- que client_contracts/client_finance — un editor puede leer sus propias
+-- tareas, pero no debe poder ver cuánto le cobrás al cliente por ellas.
+create table if not exists public.task_client_price (
+  task_id                 uuid primary key references public.tasks(id) on delete cascade,
+  client_price_per_video  numeric not null default 0,
+  updated_at              timestamptz not null default now()
 );
 
 -- Un admin puede tener su propia config de alertas (email/telefono/plantilla).
@@ -226,6 +234,7 @@ alter table public.fixed_expenses enable row level security;
 alter table public.client_finance enable row level security;
 alter table public.finance_settings enable row level security;
 alter table public.tasks enable row level security;
+alter table public.task_client_price enable row level security;
 alter table public.notify_settings enable row level security;
 alter table public.admin_emails enable row level security;
 alter table public.profiles enable row level security;
@@ -304,6 +313,10 @@ create policy "admin only fixed_expenses" on public.fixed_expenses
 
 drop policy if exists "admin only client_finance" on public.client_finance;
 create policy "admin only client_finance" on public.client_finance
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "admin only task_client_price" on public.task_client_price;
+create policy "admin only task_client_price" on public.task_client_price
   for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
 
 drop policy if exists "owner manage finance_settings" on public.finance_settings;

@@ -491,7 +491,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       videoCount: Number(r.video_count)||0, videosDone: Number(r.videos_done)||0,
       priority: r.priority || 'media', workflowStatus: r.workflow_status || 'Sin editar',
       deadline: r.deadline || '', pricePerVideo: Number(r.price_per_video)||0,
-      clientPricePerVideo: Number(r.client_price_per_video)||0,
+      clientPricePerVideo: 0, // solo admin — se completa aparte en reloadData desde task_client_price
       paid: !!r.paid, rawLink: r.raw_link || '', editedLink: r.edited_link || '',
       scriptLink: r.script_link || '', editReferenceLink: r.edit_reference_link || '', notes: r.notes || ''
     };
@@ -501,8 +501,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       project: t.project, client_id: t.clientId || null, editor_id: t.editorId || null,
       video_count: t.videoCount, videos_done: t.videosDone, priority: t.priority || 'media',
       workflow_status: t.workflowStatus || 'Sin editar',
-      deadline: t.deadline || null, price_per_video: t.pricePerVideo,
-      client_price_per_video: t.clientPricePerVideo || 0, paid: !!t.paid,
+      deadline: t.deadline || null, price_per_video: t.pricePerVideo, paid: !!t.paid,
       raw_link: t.rawLink || '', edited_link: t.editedLink || '', script_link: t.scriptLink || '',
       edit_reference_link: t.editReferenceLink || '', notes: t.notes || ''
     };
@@ -519,14 +518,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     state.tasks = (tasksRes.data || []).map(taskFromRow);
 
     if(state.currentUser && state.currentUser.type === 'admin' && state.session){
-      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes] = await Promise.all([
+      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes, taskPricesRes] = await Promise.all([
         supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
         supabase.from('client_contracts').select('*'),
         supabase.from('payment_accounts').select('*').order('name'),
         supabase.from('referrers').select('*').order('name'),
         supabase.from('fixed_expenses').select('*').order('name'),
         supabase.from('client_finance').select('*'),
-        supabase.from('finance_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle()
+        supabase.from('finance_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
+        supabase.from('task_client_price').select('*')
       ]);
       state.notifySettings = ns.data
         ? { email: ns.data.email || '', phone: ns.data.phone || '', template: ns.data.template || DEFAULT_ALERT_TEMPLATE }
@@ -551,6 +551,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       state.financeSettings = fsRes.data
         ? { ownerSharePct: Number(fsRes.data.owner_share_pct) || 70 }
         : { ownerSharePct: 70 };
+
+      const clientPriceByTaskId = {};
+      (taskPricesRes.data || []).forEach(row => { clientPriceByTaskId[row.task_id] = Number(row.client_price_per_video)||0; });
+      state.tasks.forEach(t => { t.clientPricePerVideo = clientPriceByTaskId[t.id] || 0; });
     }
   }
 
@@ -2368,11 +2372,17 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         askConfirm('¿Eliminar esta tarea?', () => withBusy(async () => {
           const t = state.tasks.find(x=>x.id===id);
           const row = t ? { id: t.id, ...taskToRow(t) } : null;
+          const clientPrice = t ? Number(t.clientPricePerVideo||0) : 0;
           const { error } = await supabase.from('tasks').delete().eq('id', id);
           if(error) throw error;
           if(row) pushUndo('Eliminar tarea', async () => {
             const { error } = await supabase.from('tasks').insert(row);
             if(error) throw error;
+            if(clientPrice){
+              const { error: priceError } = await supabase.from('task_client_price')
+                .insert({ task_id: row.id, client_price_per_video: clientPrice });
+              if(priceError) throw priceError;
+            }
           });
           await reloadData();
           render();
@@ -2761,6 +2771,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
   function renderTaskModal(data, restrictEditorId, seed){
     const src = data || seed || null;
+    const canSeeClientPrice = state.currentUser.type === 'admin' && !isPreviewMode();
     const editorOptions = state.editors.map(e=>`<option value="${e.id}" ${src&&src.editorId===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('');
     const editorFieldHtml = restrictEditorId ? `
           <div class="field">
@@ -2801,11 +2812,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="field"><label class="field-label">Fecha de entrega</label><input type="date" id="input-task-deadline" value="${src?src.deadline||'':''}"></div>
         <div class="field"><label class="field-label">Precio por video (a favor del editor)</label><input type="number" min="0" step="0.01" id="input-task-price" value="${src?src.pricePerVideo:0}"></div>
       </div>
+      ${ canSeeClientPrice ? `
       <div class="field">
         <label class="field-label">Precio por video (lo que le cobrás al cliente)</label>
         <input type="number" min="0" step="0.01" id="input-task-client-price" value="${src?src.clientPricePerVideo||0:0}">
-        <p class="field-hint">Opcional — cargalo si este proyecto tiene un precio de venta por video definido, para calcular el margen real (venta − pago al editor) en la ficha del cliente.</p>
-      </div>
+        <p class="field-hint">Opcional — cargalo si este proyecto tiene un precio de venta por video definido, para calcular el margen real (venta − pago al editor) en la ficha del cliente. Esto no lo ven los editores.</p>
+      </div>` : '' }
       <div class="field">
         <label class="field-label">Estado de edición</label>
         <select id="input-task-workflow">
@@ -3137,6 +3149,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           if(match) clientId = match.id;
         }
       }
+      const clientPriceInput = document.getElementById('input-task-client-price');
       const payload = {
         project,
         clientId,
@@ -3146,7 +3159,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         workflowStatus: document.getElementById('input-task-workflow').value || 'Sin editar',
         deadline: document.getElementById('input-task-deadline').value,
         pricePerVideo: Number(document.getElementById('input-task-price').value) || 0,
-        clientPricePerVideo: Number(document.getElementById('input-task-client-price').value) || 0,
         videosDone: Number(document.getElementById('input-task-done').value) || 0,
         paid: document.getElementById('input-task-paid').checked,
         rawLink: document.getElementById('input-task-raw').value.trim(),
@@ -3160,15 +3172,35 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const row = taskToRow(payload);
       if(data){
         const oldRow = taskToRow(data);
+        const oldClientPrice = Number(data.clientPricePerVideo||0);
         const { error } = await supabase.from('tasks').update(row).eq('id', data.id);
         if(error) throw error;
+        if(clientPriceInput){
+          const newClientPrice = Number(clientPriceInput.value) || 0;
+          const { error: priceError } = await supabase.from('task_client_price')
+            .upsert({ task_id: data.id, client_price_per_video: newClientPrice }, { onConflict: 'task_id' });
+          if(priceError) throw priceError;
+        }
         pushUndo('Editar tarea', async () => {
           const { error } = await supabase.from('tasks').update(oldRow).eq('id', data.id);
           if(error) throw error;
+          if(clientPriceInput){
+            const { error: priceError } = await supabase.from('task_client_price')
+              .upsert({ task_id: data.id, client_price_per_video: oldClientPrice }, { onConflict: 'task_id' });
+            if(priceError) throw priceError;
+          }
         });
       } else {
         const { data: inserted, error } = await supabase.from('tasks').insert(row).select().single();
         if(error) throw error;
+        if(inserted && clientPriceInput){
+          const newClientPrice = Number(clientPriceInput.value) || 0;
+          if(newClientPrice){
+            const { error: priceError } = await supabase.from('task_client_price')
+              .upsert({ task_id: inserted.id, client_price_per_video: newClientPrice }, { onConflict: 'task_id' });
+            if(priceError) throw priceError;
+          }
+        }
         if(inserted) pushUndo('Crear tarea', async () => {
           const { error } = await supabase.from('tasks').delete().eq('id', inserted.id);
           if(error) throw error;
