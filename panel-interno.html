@@ -1969,14 +1969,17 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const editorExpenseRows = state.editors.map(e=>{
       const myTasks = state.tasks.filter(t=>t.editorId===e.id);
       const generated = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+      const projected = myTasks.reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
       const paidAmount = myTasks.reduce((s,t)=>s+taskPaidAmount(t),0);
       const pending = generated - paidAmount;
+      const goal = Number(e.goal||0);
+      const goalLabel = goal <= 0 ? 'sin meta' : (generated >= goal ? 'meta cumplida' : `faltan ${fmtMoney(goal - generated)}`);
       return `<div class="manage-row">
         <div class="manage-row-main">
           ${avatarMark(e.name)}
           <div>
             <button class="manage-row-name-btn" data-view-editor="${e.id}">${escapeHtml(e.name)}</button>
-            <div class="sub">Generado ${fmtMoney(generated)} · Pagado ${fmtMoney(paidAmount)} · Pendiente ${fmtMoney(pending)} · Sale de ${e.payoutAccountId ? escapeHtml(paymentAccountName(e.payoutAccountId)) : 'sin cuenta'}</div>
+            <div class="sub">Generado ${fmtMoney(generated)} · Proyectado ${fmtMoney(projected)} · Meta ${fmtMoney(goal)} (${goalLabel}) · Pagado ${fmtMoney(paidAmount)} · Pendiente ${fmtMoney(pending)} · Sale de ${e.payoutAccountId ? escapeHtml(paymentAccountName(e.payoutAccountId)) : 'sin cuenta'}</div>
           </div>
         </div>
       </div>`;
