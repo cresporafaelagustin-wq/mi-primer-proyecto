@@ -93,6 +93,9 @@ create table if not exists public.client_finance (
   payment_account_id       uuid references public.payment_accounts(id) on delete set null,
   payment_status           text not null default '' check (payment_status in ('', 'Al día', 'Debe', 'No paga')),
   amount_owed              numeric not null default 0,
+  paid_video_count         integer not null default 0,
+  sale_price_per_video     numeric not null default 0,
+  editor_price_per_video   numeric not null default 0,
   updated_at               timestamptz not null default now()
 );
 

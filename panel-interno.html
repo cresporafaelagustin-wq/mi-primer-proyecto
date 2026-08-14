@@ -470,7 +470,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       totalCharge: Number(r.total_charge)||0, totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
       referrerId: r.referrer_id || '', referrerCommissionPct: Number(r.referrer_commission_pct)||0,
       referrerPaid: !!r.referrer_paid, paymentAccountId: r.payment_account_id || '',
-      paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0
+      paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0,
+      paidVideoCount: Number(r.paid_video_count)||0, salePricePerVideo: Number(r.sale_price_per_video)||0,
+      editorPricePerVideo: Number(r.editor_price_per_video)||0
     };
   }
   function clientFromRow(r){
@@ -481,8 +483,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       brandManualLink: r.brand_manual_link || '',
       contractLink: '', // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
       totalCharge: 0, totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
-      referrerPaid: false, paymentAccountId: '', paymentStatus: '', amountOwed: 0
-      // paymentStatus/amountOwed/totalCharge también vienen de client_finance, solo para admin
+      referrerPaid: false, paymentAccountId: '', paymentStatus: '', amountOwed: 0,
+      paidVideoCount: 0, salePricePerVideo: 0, editorPricePerVideo: 0
+      // paymentStatus/amountOwed/totalCharge/plan por video también vienen de client_finance, solo para admin
     };
   }
   function taskFromRow(r){
@@ -797,6 +800,25 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function clientPendingDeliveryValue(client){
     // Cuánto vale en plata lo que todavía le falta entregar a este cliente, según ese precio por video.
     return clientVideosPending(client.id) * clientPricePerVideoFromCharge(client);
+  }
+  // ===== Plan de pago por video: "el cliente pagó X videos a $Y cada uno" =====
+  function clientPaidVideosRevenue(client){
+    return Number(client.paidVideoCount||0) * Number(client.salePricePerVideo||0);
+  }
+  function clientPaidVideosEditorCost(client){
+    // Lo que hay que guardar para pagarle al editor los videos que el cliente ya pagó,
+    // se hayan entregado o no todavía.
+    return Number(client.paidVideoCount||0) * Number(client.editorPricePerVideo||0);
+  }
+  function clientPaidVideosMargin(client){
+    return clientPaidVideosRevenue(client) - clientPaidVideosEditorCost(client);
+  }
+  function clientPaidVideosPlanHint(client){
+    if(!Number(client.paidVideoCount||0)) return 'Cargá cuántos videos pagó y a cuánto para ver cuánto guardar para el editor.';
+    const revenue = clientPaidVideosRevenue(client);
+    const editorCost = clientPaidVideosEditorCost(client);
+    const margin = revenue - editorCost;
+    return `Cobrás ${fmtMoney(revenue)} · guardás ${fmtMoney(editorCost)} para el editor · te quedan ${fmtMoney(margin)}.`;
   }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -1787,6 +1809,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
       ${ (clientVideoRevenue(client.id) === 0 && clientVideoRevenueProjected(client.id) === 0) ? `<p class="field-hint" style="margin-bottom:34px;">Cargá el "Precio por video (lo que le cobrás al cliente)" en cada tarea de este cliente para que este cálculo funcione.</p>` : '' }
 
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Plan de pago</span><h2 class="section-title">Videos que ya pagó</h2></div></div>
+      <div class="stat-grid">
+        ${statCard('Videos pagados', client.paidVideoCount||0, 'Cantidad de videos que este cliente ya pagó, cargado desde "Editar finanzas".')}
+        ${statCard('Cobrado por esos videos', fmtMoney(clientPaidVideosRevenue(client)), 'Videos pagados × precio por video que le cobrás.')}
+        ${statCard('A guardar para el editor', fmtMoney(clientPaidVideosEditorCost(client)), 'Videos pagados × precio por video que le pagás al editor. Esta plata no es tuya — hay que reservarla aunque el editor todavía no haya entregado.')}
+        ${statCard('Margen tuyo', fmtMoney(clientPaidVideosMargin(client)), 'Lo que le cobrás menos lo que hay que guardar para el editor, por los videos ya pagados.')}
+      </div>
+      ${ !client.paidVideoCount ? `<p class="field-hint" style="margin-bottom:34px;">Cargá "Videos que ya pagó" y los dos precios por video en "Editar finanzas" para que esto se calcule.</p>` : '' }
+
       <div class="goal-box" style="margin-bottom:34px;">
         <div class="task-meta">
           <span>Cobrado en <span class="mono">${client.paymentAccountId ? escapeHtml(paymentAccountName(client.paymentAccountId)) : 'sin cuenta asignada'}</span></span>
@@ -2624,6 +2655,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const totalCharge = Number(client.totalCharge||0), totalIncome = Number(client.totalIncome||0);
     const owed = totalCharge - totalIncome;
     const debtHintText = owed > 0 ? `Falta cobrar ${fmtMoney(owed)}.` : (totalCharge > 0 ? 'Ya se cobró todo.' : 'Cargá el total a cobrar para ver cuánto falta.');
+    const planHintText = clientPaidVideosPlanHint(client);
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
       <h3>Finanzas de ${escapeHtml(client.name)}</h3>
@@ -2632,6 +2664,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="field"><label class="field-label">Cobrado hasta ahora ($)</label><input type="number" step="0.01" id="input-finance-income" value="${client.totalIncome || ''}" placeholder="0"></div>
       </div>
       <p class="field-hint" id="finance-debt-hint" style="margin-bottom:15px;">${escapeHtml(debtHintText)}</p>
+
+      <label class="field-label" style="display:block; margin-bottom:8px;">Plan de pago por video</label>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Videos que ya pagó</label><input type="number" min="0" step="1" id="input-finance-paid-videos" value="${client.paidVideoCount || ''}" placeholder="0"></div>
+        <div class="field"><label class="field-label">Precio por video (le cobrás)</label><input type="number" min="0" step="0.01" id="input-finance-sale-price" value="${client.salePricePerVideo || ''}" placeholder="0"></div>
+      </div>
+      <div class="field"><label class="field-label">Precio por video (le pagás al editor)</label><input type="number" min="0" step="0.01" id="input-finance-editor-price" value="${client.editorPricePerVideo || ''}" placeholder="0"></div>
+      <p class="field-hint" id="finance-plan-hint" style="margin-bottom:15px;">${escapeHtml(planHintText)}</p>
+
       <div class="field-row">
         <div class="field"><label class="field-label">Estado de pago</label><select id="input-finance-payment-status"><option value="">Sin estado</option>${paymentOptions}</select></div>
         <div class="field"><label class="field-label">Comisión pasarela ($)</label><input type="number" step="0.01" id="input-finance-gateway" value="${client.gatewayFee || ''}" placeholder="0"></div>
@@ -2885,6 +2926,22 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       financeIncomeInput.addEventListener('input', updateDebtHint);
     }
 
+    const planHint = document.getElementById('finance-plan-hint');
+    const paidVideosInput = document.getElementById('input-finance-paid-videos');
+    const salePriceInput = document.getElementById('input-finance-sale-price');
+    const editorPriceInput = document.getElementById('input-finance-editor-price');
+    if(planHint && paidVideosInput && salePriceInput && editorPriceInput){
+      const updatePlanHint = () => {
+        const paidVideoCount = Number(paidVideosInput.value) || 0;
+        const salePricePerVideo = Number(salePriceInput.value) || 0;
+        const editorPricePerVideo = Number(editorPriceInput.value) || 0;
+        planHint.textContent = clientPaidVideosPlanHint({ paidVideoCount, salePricePerVideo, editorPricePerVideo });
+      };
+      paidVideosInput.addEventListener('input', updatePlanHint);
+      salePriceInput.addEventListener('input', updatePlanHint);
+      editorPriceInput.addEventListener('input', updatePlanHint);
+    }
+
     const clientSearch = document.getElementById('input-task-client-search');
     const clientHidden = document.getElementById('input-task-client');
     const clientSuggestionsBox = document.getElementById('client-suggestions');
@@ -3052,6 +3109,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         referrer_id: document.getElementById('input-finance-referrer').value || null,
         referrer_commission_pct: Number(document.getElementById('input-finance-referrer-pct').value) || 0,
         referrer_paid: document.getElementById('input-finance-referrer-paid').checked,
+        paid_video_count: Number(document.getElementById('input-finance-paid-videos').value) || 0,
+        sale_price_per_video: Number(document.getElementById('input-finance-sale-price').value) || 0,
+        editor_price_per_video: Number(document.getElementById('input-finance-editor-price').value) || 0,
       };
       const { error } = await supabase.from('client_finance').upsert(payload, { onConflict: 'client_id' });
       if(error) throw error;
