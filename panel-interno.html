@@ -2907,13 +2907,29 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     </div></div>`;
   }
 
-  function closeModal(){ state.modal = null; render(); }
+  let modalDirty = false;
+  let lastAttachedModalRef = null;
+
+  function closeModal(){ modalDirty = false; lastAttachedModalRef = null; state.modal = null; render(); }
+
+  function closeModalIfConfirmed(){
+    if(modalDirty && state.modal && state.modal.kind !== 'confirm'){
+      if(!window.confirm('¿Salir sin guardar? Se va a perder lo que escribiste.')) return;
+    }
+    closeModal();
+  }
 
   function attachModalEvents(){
+    if(state.modal !== lastAttachedModalRef){ modalDirty = false; lastAttachedModalRef = state.modal; }
+    const modalBox = document.querySelector('.modal');
+    if(modalBox && state.modal && state.modal.kind !== 'confirm'){
+      modalBox.addEventListener('input', () => { modalDirty = true; });
+      modalBox.addEventListener('change', () => { modalDirty = true; });
+    }
     const backdrop = document.getElementById('modal-backdrop');
-    if(backdrop) backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
+    if(backdrop) backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModalIfConfirmed(); });
     const cancelBtn = document.getElementById('btn-cancel-modal');
-    if(cancelBtn) cancelBtn.onclick = closeModal;
+    if(cancelBtn) cancelBtn.onclick = closeModalIfConfirmed;
 
     const debtHint = document.getElementById('finance-debt-hint');
     const totalChargeInput = document.getElementById('input-finance-total-charge');
