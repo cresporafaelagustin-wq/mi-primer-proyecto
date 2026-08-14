@@ -1707,7 +1707,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <td>${statusLabel(taskStatus(t))}</td>
         ${ isAdmin ? `
         <td class="mono">${t.videosDone||0}/${t.videoCount||0}</td>
-        <td class="mono">${fmtMoney(t.pricePerVideo)}</td>
+        <td class="mono">${fmtMoney(t.clientPricePerVideo)}</td>
         <td class="mono">${fmtMoney(Number(t.videosDone||0)*Number(t.pricePerVideo||0))}</td>` : '' }
         <td class="mono">${fmtDate(t.deadline)}</td>
       </tr>
