@@ -2259,8 +2259,32 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       btn.onclick = () => {
         const id = btn.getAttribute('data-delete-editor');
         askConfirm('¿Eliminar este editor? Las tareas asignadas quedarán sin asignar.', () => withBusy(async () => {
+          const e = state.editors.find(x=>x.id===id);
+          const editorRow = e ? {
+            id: e.id, name: e.name, email: e.email || null, goal: e.goal || 0,
+            tracker_link: e.trackerLink || '', payout_account_id: e.payoutAccountId || null,
+            notification_email: e.notificationEmail || '', notification_phone: e.notificationPhone || ''
+          } : null;
+          const affectedTaskIds = state.tasks.filter(t=>t.editorId===id).map(t=>t.id);
+          const { data: affectedProfiles } = await supabase.from('profiles').select('id').eq('editor_id', id);
+          const affectedProfileIds = (affectedProfiles || []).map(p=>p.id);
+
           const { error } = await supabase.from('editors').delete().eq('id', id);
           if(error) throw error;
+
+          if(editorRow) pushUndo('Eliminar editor', async () => {
+            const { error } = await supabase.from('editors').insert(editorRow);
+            if(error) throw error;
+            if(affectedTaskIds.length){
+              const { error: taskErr } = await supabase.from('tasks').update({ editor_id: id }).in('id', affectedTaskIds);
+              if(taskErr) throw taskErr;
+            }
+            if(affectedProfileIds.length){
+              const { error: profErr } = await supabase.from('profiles').update({ editor_id: id }).in('id', affectedProfileIds);
+              if(profErr) throw profErr;
+            }
+          });
+
           await reloadData();
           render();
         }));
@@ -2270,8 +2294,43 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       btn.onclick = () => {
         const id = btn.getAttribute('data-delete-client');
         askConfirm('¿Eliminar este cliente? Las tareas asociadas quedarán sin cliente.', () => withBusy(async () => {
+          const c = state.clients.find(x=>x.id===id);
+          const clientRow = c ? {
+            id: c.id, name: c.name, status: c.status || '',
+            instagram_link: c.instagramLink || '', drive_link: c.driveLink || '',
+            tracker_link: c.trackerLink || '', reference_link: c.referenceLink || '',
+            brand_manual_link: c.brandManualLink || ''
+          } : null;
+          const contractRow = c && c.contractLink ? { client_id: c.id, contract_link: c.contractLink } : null;
+          const financeRow = c ? {
+            client_id: c.id, total_income: c.totalIncome||0, gateway_fee: c.gatewayFee||0,
+            referrer_id: c.referrerId || null, referrer_commission_pct: c.referrerCommissionPct||0,
+            referrer_paid: !!c.referrerPaid, payment_account_id: c.paymentAccountId || null,
+            payment_status: c.paymentStatus || '', amount_owed: c.amountOwed||0
+          } : null;
+          const hasFinanceData = financeRow && (financeRow.total_income || financeRow.gateway_fee || financeRow.referrer_id || financeRow.referrer_commission_pct || financeRow.referrer_paid || financeRow.payment_account_id || financeRow.payment_status || financeRow.amount_owed);
+          const affectedTaskIds = state.tasks.filter(t=>t.clientId===id).map(t=>t.id);
+
           const { error } = await supabase.from('clients').delete().eq('id', id);
           if(error) throw error;
+
+          if(clientRow) pushUndo('Eliminar cliente', async () => {
+            const { error } = await supabase.from('clients').insert(clientRow);
+            if(error) throw error;
+            if(contractRow){
+              const { error: contractErr } = await supabase.from('client_contracts').insert(contractRow);
+              if(contractErr) throw contractErr;
+            }
+            if(hasFinanceData){
+              const { error: financeErr } = await supabase.from('client_finance').insert(financeRow);
+              if(financeErr) throw financeErr;
+            }
+            if(affectedTaskIds.length){
+              const { error: taskErr } = await supabase.from('tasks').update({ client_id: id }).in('id', affectedTaskIds);
+              if(taskErr) throw taskErr;
+            }
+          });
+
           await reloadData();
           render();
         }));
