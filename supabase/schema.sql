@@ -84,6 +84,7 @@ create table if not exists public.fixed_expenses (
 -- que client_contracts (ocultarlo de editores a nivel de base de datos).
 create table if not exists public.client_finance (
   client_id                uuid primary key references public.clients(id) on delete cascade,
+  total_charge             numeric not null default 0,
   total_income             numeric not null default 0,
   gateway_fee              numeric not null default 0,
   referrer_id              uuid references public.referrers(id) on delete set null,

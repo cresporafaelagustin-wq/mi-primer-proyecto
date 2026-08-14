@@ -454,7 +454,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
   function clientFinanceFromRow(r){
     return {
-      totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
+      totalCharge: Number(r.total_charge)||0, totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
       referrerId: r.referrer_id || '', referrerCommissionPct: Number(r.referrer_commission_pct)||0,
       referrerPaid: !!r.referrer_paid, paymentAccountId: r.payment_account_id || '',
       paymentStatus: r.payment_status || '', amountOwed: Number(r.amount_owed)||0
@@ -467,9 +467,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       trackerLink: r.tracker_link || '', referenceLink: r.reference_link || '',
       brandManualLink: r.brand_manual_link || '',
       contractLink: '', // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
-      totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
+      totalCharge: 0, totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
       referrerPaid: false, paymentAccountId: '', paymentStatus: '', amountOwed: 0
-      // paymentStatus/amountOwed también vienen de client_finance, solo para admin
+      // paymentStatus/amountOwed/totalCharge también vienen de client_finance, solo para admin
     };
   }
   function taskFromRow(r){
@@ -1702,8 +1702,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="section-head"><div><span class="section-tag">Solo admin</span><h2 class="section-title">Finanzas</h2></div><button class="btn btn-ghost btn-sm" data-edit-client-finance="${client.id}">Editar finanzas</button></div>
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Pago</div><div class="stat-value" style="font-size:15px;">${client.paymentStatus ? escapeHtml(client.paymentStatus) : 'Sin estado'}</div></div>
+        <div class="stat-card"><div class="stat-label">Total a cobrar</div><div class="stat-value">${fmtMoney(client.totalCharge)}</div></div>
+        <div class="stat-card"><div class="stat-label">Cobrado</div><div class="stat-value">${fmtMoney(client.totalIncome)}</div></div>
         <div class="stat-card"><div class="stat-label">Debe</div><div class="stat-value">${fmtMoney(client.amountOwed)}</div></div>
-        <div class="stat-card"><div class="stat-label">Ingreso total</div><div class="stat-value">${fmtMoney(client.totalIncome)}</div></div>
         <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(clientEditingCost(client.id))}</div></div>
         <div class="stat-card"><div class="stat-label">Costo edición (proyectado)</div><div class="stat-value">${fmtMoney(clientEditingCostProjected(client.id))}</div></div>
         <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(client.gatewayFee)}</div></div>
@@ -2501,11 +2502,20 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   function renderClientFinanceModal(client){
     const referrerOptions = state.referrers.map(r=>`<option value="${r.id}" ${client.referrerId===r.id?'selected':''}>${escapeHtml(r.name)}</option>`).join('');
+    const paymentOptions = CLIENT_PAYMENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${client.paymentStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
+    const totalCharge = Number(client.totalCharge||0), totalIncome = Number(client.totalIncome||0);
+    const owed = totalCharge - totalIncome;
+    const debtHintText = owed > 0 ? `Falta cobrar ${fmtMoney(owed)}.` : (totalCharge > 0 ? 'Ya se cobró todo.' : 'Cargá el total a cobrar para ver cuánto falta.');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
       <h3>Finanzas de ${escapeHtml(client.name)}</h3>
       <div class="field-row">
-        <div class="field"><label class="field-label">Ingreso total cobrado ($)</label><input type="number" step="0.01" id="input-finance-income" value="${client.totalIncome || ''}" placeholder="0"></div>
+        <div class="field"><label class="field-label">Total a cobrar ($)</label><input type="number" step="0.01" id="input-finance-total-charge" value="${client.totalCharge || ''}" placeholder="0"></div>
+        <div class="field"><label class="field-label">Cobrado hasta ahora ($)</label><input type="number" step="0.01" id="input-finance-income" value="${client.totalIncome || ''}" placeholder="0"></div>
+      </div>
+      <p class="field-hint" id="finance-debt-hint" style="margin-bottom:15px;">${escapeHtml(debtHintText)}</p>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Estado de pago</label><select id="input-finance-payment-status"><option value="">Sin estado</option>${paymentOptions}</select></div>
         <div class="field"><label class="field-label">Comisión pasarela ($)</label><input type="number" step="0.01" id="input-finance-gateway" value="${client.gatewayFee || ''}" placeholder="0"></div>
       </div>
       <div class="field"><label class="field-label">Cuenta donde se cobró</label><select id="input-finance-account">${accountOptionsHtml(client.paymentAccountId)}</select></div>
@@ -2640,17 +2650,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
   function renderClientModal(data){
     const statusOptions = CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${data&&data.status===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
-    const paymentOptions = CLIENT_PAYMENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${data&&data.paymentStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
       <h3>${data ? 'Editar cliente' : 'Nuevo cliente'}</h3>
       <div class="field"><label class="field-label">Nombre del cliente</label><input type="text" id="input-client-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Café Luna"></div>
       <div class="field"><label class="field-label">Estado</label><select id="input-client-status"><option value="">Sin estado</option>${statusOptions}</select></div>
-
-      <div class="field-row">
-        <div class="field"><label class="field-label">Estado de pago</label><select id="input-client-payment-status"><option value="">Sin estado</option>${paymentOptions}</select></div>
-        <div class="field"><label class="field-label">Monto adeudado ($)</label><input type="number" min="0" step="0.01" id="input-client-amount-owed" value="${data && data.amountOwed ? data.amountOwed : ''}" placeholder="0"></div>
-      </div>
+      <p class="field-hint">El estado de pago y lo que se le cobra a este cliente se cargan desde "Editar finanzas" en su ficha.</p>
 
       <div class="field"><label class="field-label">Instagram</label><input type="text" id="input-client-instagram" value="${escapeHtml(data?data.instagramLink||'':'')}" placeholder="https://instagram.com/..."></div>
       <div class="field"><label class="field-label">Drive</label><input type="text" id="input-client-drive" value="${escapeHtml(data?data.driveLink||'':'')}" placeholder="https://drive.google.com/..."></div>
@@ -2741,6 +2746,20 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const cancelBtn = document.getElementById('btn-cancel-modal');
     if(cancelBtn) cancelBtn.onclick = closeModal;
 
+    const debtHint = document.getElementById('finance-debt-hint');
+    const totalChargeInput = document.getElementById('input-finance-total-charge');
+    const financeIncomeInput = document.getElementById('input-finance-income');
+    if(debtHint && totalChargeInput && financeIncomeInput){
+      const updateDebtHint = () => {
+        const totalCharge = Number(totalChargeInput.value) || 0;
+        const income = Number(financeIncomeInput.value) || 0;
+        const owed = totalCharge - income;
+        debtHint.textContent = owed > 0 ? `Falta cobrar ${fmtMoney(owed)}.` : (totalCharge > 0 ? 'Ya se cobró todo.' : 'Cargá el total a cobrar para ver cuánto falta.');
+      };
+      totalChargeInput.addEventListener('input', updateDebtHint);
+      financeIncomeInput.addEventListener('input', updateDebtHint);
+    }
+
     const clientSearch = document.getElementById('input-task-client-search');
     const clientHidden = document.getElementById('input-task-client');
     const clientSuggestionsBox = document.getElementById('client-suggestions');
@@ -2813,8 +2832,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         brand_manual_link: document.getElementById('input-client-brand-manual').value.trim(),
       };
       const contractLink = document.getElementById('input-client-contract').value.trim();
-      const paymentStatus = document.getElementById('input-client-payment-status').value;
-      const amountOwed = Number(document.getElementById('input-client-amount-owed').value) || 0;
       const data = state.modal.data;
       let clientId = data ? data.id : null;
       if(data){
@@ -2828,9 +2845,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const { error: contractError } = await supabase.from('client_contracts')
         .upsert({ client_id: clientId, contract_link: contractLink }, { onConflict: 'client_id' });
       if(contractError) throw contractError;
-      const { error: financeError } = await supabase.from('client_finance')
-        .upsert({ client_id: clientId, payment_status: paymentStatus, amount_owed: amountOwed }, { onConflict: 'client_id' });
-      if(financeError) throw financeError;
       closeModal();
       await reloadData();
       render();
@@ -2900,9 +2914,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const saveClientFinanceBtn = document.getElementById('btn-save-client-finance');
     if(saveClientFinanceBtn) saveClientFinanceBtn.onclick = () => withBusy(async () => {
       const client = state.modal.data;
+      const totalCharge = Number(document.getElementById('input-finance-total-charge').value) || 0;
+      const totalIncome = Number(document.getElementById('input-finance-income').value) || 0;
       const payload = {
         client_id: client.id,
-        total_income: Number(document.getElementById('input-finance-income').value) || 0,
+        total_charge: totalCharge,
+        total_income: totalIncome,
+        amount_owed: Math.max(totalCharge - totalIncome, 0),
+        payment_status: document.getElementById('input-finance-payment-status').value,
         gateway_fee: Number(document.getElementById('input-finance-gateway').value) || 0,
         payment_account_id: document.getElementById('input-finance-account').value || null,
         referrer_id: document.getElementById('input-finance-referrer').value || null,
