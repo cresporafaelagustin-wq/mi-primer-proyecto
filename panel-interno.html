@@ -725,6 +725,19 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     // Cuánto queda si todavía no se le pagó al editor lo que está pendiente (ese costo no salió de la cuenta).
     return clientNetProfit(client) + clientEditingPendingAmount(client.id);
   }
+  function clientEditingCostProjected(clientId){
+    // Lo que se le va a terminar pagando al editor por las tareas asignadas a este cliente,
+    // usando el total de videos de cada tarea (no solo los ya hechos) — aunque todavía no
+    // estén completadas ni pagadas.
+    return state.tasks.filter(t=>t.clientId===clientId).reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
+  }
+  function clientRetainedProjected(client){
+    return clientEditingCostProjected(client.id) + Number(client.gatewayFee||0) + clientReferrerCommissionAmount(client);
+  }
+  function clientNetProfitProjected(client){
+    // Ganancia neta si todo lo asignado a este cliente se termina y se paga.
+    return Number(client.totalIncome||0) - clientRetainedProjected(client);
+  }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function render(){
@@ -1692,10 +1705,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="stat-card"><div class="stat-label">Debe</div><div class="stat-value">${fmtMoney(client.amountOwed)}</div></div>
         <div class="stat-card"><div class="stat-label">Ingreso total</div><div class="stat-value">${fmtMoney(client.totalIncome)}</div></div>
         <div class="stat-card"><div class="stat-label">Costo edición</div><div class="stat-value">${fmtMoney(clientEditingCost(client.id))}</div></div>
+        <div class="stat-card"><div class="stat-label">Costo edición (proyectado)</div><div class="stat-value">${fmtMoney(clientEditingCostProjected(client.id))}</div></div>
         <div class="stat-card"><div class="stat-label">Comisión pasarela</div><div class="stat-value">${fmtMoney(client.gatewayFee)}</div></div>
         <div class="stat-card"><div class="stat-label">Comisión referido</div><div class="stat-value">${fmtMoney(clientReferrerCommissionAmount(client))}</div></div>
         <div class="stat-card"><div class="stat-label">Ganancia neta</div><div class="stat-value">${fmtMoney(clientNetProfit(client))}</div></div>
         <div class="stat-card"><div class="stat-label">Neta sin pagar edición pendiente</div><div class="stat-value">${fmtMoney(clientNetProfitBeforePayingEditing(client))}</div></div>
+        <div class="stat-card"><div class="stat-label">Ganancia neta (proyectada)</div><div class="stat-value">${fmtMoney(clientNetProfitProjected(client))}</div></div>
       </div>
       <div class="goal-box" style="margin-bottom:34px;">
         <div class="task-meta">
@@ -1872,6 +1887,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const totalEditingPaid = state.tasks.reduce((s,t)=>s+taskPaidAmount(t),0);
     const totalEditingPending = totalEditingCost - totalEditingPaid;
     const netProfitBeforePayingEditing = netProfit + totalEditingPending;
+    const totalEditingCostProjected = state.tasks.reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.pricePerVideo||0),0);
+    const totalToHoldProjected = totalEditingCostProjected + totalReferrerCommission + totalGatewayFees + totalFixedExpenses;
+    const netProfitProjected = totalIncome - totalToHoldProjected;
     const ownerPct = Number(state.financeSettings.ownerSharePct)||0;
     const ownerShare = netProfit * ownerPct / 100;
     const reserveShare = netProfit * (100 - ownerPct) / 100;
@@ -1946,6 +1964,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="stat-card"><div class="stat-label">Total a guardar</div><div class="stat-value">${fmtMoney(totalToHold)}</div></div>
         <div class="stat-card"><div class="stat-label">Ganancia líquida</div><div class="stat-value">${fmtMoney(netProfit)}</div></div>
         <div class="stat-card"><div class="stat-label">Líquida sin pagar edición pendiente</div><div class="stat-value">${fmtMoney(netProfitBeforePayingEditing)}</div></div>
+        <div class="stat-card"><div class="stat-label">Costo edición (proyectado)</div><div class="stat-value">${fmtMoney(totalEditingCostProjected)}</div></div>
+        <div class="stat-card"><div class="stat-label">Ganancia líquida (proyectada)</div><div class="stat-value">${fmtMoney(netProfitProjected)}</div></div>
         <div class="stat-card"><div class="stat-label">Tu parte (${ownerPct}%)</div><div class="stat-value">${fmtMoney(ownerShare)}</div></div>
         <div class="stat-card"><div class="stat-label">Fondo de reserva</div><div class="stat-value">${fmtMoney(reserveShare)}</div></div>
       </div>
