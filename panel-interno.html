@@ -801,24 +801,26 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     // Cuánto vale en plata lo que todavía le falta entregar a este cliente, según ese precio por video.
     return clientVideosPending(client.id) * clientPricePerVideoFromCharge(client);
   }
-  // ===== Plan de pago por video: "el cliente pagó X videos a $Y cada uno" =====
+  // ===== Reparto por video: cuántos videos incluye el trato en total, a cuánto se lo cobrás
+  // al cliente y a cuánto le pagás al editor. Es el TOTAL del trato, no lo ya cobrado —
+  // "Cobrado hasta ahora" (arriba) es aparte y sigue el estado de la plata que ya entró. =====
   function clientPaidVideosRevenue(client){
     return Number(client.paidVideoCount||0) * Number(client.salePricePerVideo||0);
   }
   function clientPaidVideosEditorCost(client){
-    // Lo que hay que guardar para pagarle al editor los videos que el cliente ya pagó,
-    // se hayan entregado o no todavía.
+    // Lo que hay que guardar para pagarle al editor los videos del trato,
+    // se hayan entregado o no todavía, y se haya cobrado todo o no todavía.
     return Number(client.paidVideoCount||0) * Number(client.editorPricePerVideo||0);
   }
   function clientPaidVideosMargin(client){
     return clientPaidVideosRevenue(client) - clientPaidVideosEditorCost(client);
   }
   function clientPaidVideosPlanHint(client){
-    if(!Number(client.paidVideoCount||0)) return 'Cargá cuántos videos pagó y a cuánto para ver cuánto guardar para el editor.';
+    if(!Number(client.paidVideoCount||0)) return 'Cargá la cantidad total de videos del trato y a cuánto para ver cuánto guardar para el editor.';
     const revenue = clientPaidVideosRevenue(client);
     const editorCost = clientPaidVideosEditorCost(client);
     const margin = revenue - editorCost;
-    return `Cobrás ${fmtMoney(revenue)} · guardás ${fmtMoney(editorCost)} para el editor · te quedan ${fmtMoney(margin)}.`;
+    return `Por el trato entero cobrás ${fmtMoney(revenue)} · guardás ${fmtMoney(editorCost)} para el editor · te quedan ${fmtMoney(margin)} de ganancia. (Se haya cobrado todo o no todavía — eso lo ves arriba, en "Cobrado hasta ahora".)`;
   }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -1809,14 +1811,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
       ${ (clientVideoRevenue(client.id) === 0 && clientVideoRevenueProjected(client.id) === 0) ? `<p class="field-hint" style="margin-bottom:34px;">Cargá el "Precio por video (lo que le cobrás al cliente)" en cada tarea de este cliente para que este cálculo funcione.</p>` : '' }
 
-      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Plan de pago</span><h2 class="section-title">Videos que ya pagó</h2></div></div>
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Reparto por video</span><h2 class="section-title">El trato completo, video por video</h2></div></div>
       <div class="stat-grid">
-        ${statCard('Videos pagados', client.paidVideoCount||0, 'Cantidad de videos que este cliente ya pagó, cargado desde "Editar finanzas".')}
-        ${statCard('Cobrado por esos videos', fmtMoney(clientPaidVideosRevenue(client)), 'Videos pagados × precio por video que le cobrás.')}
-        ${statCard('A guardar para el editor', fmtMoney(clientPaidVideosEditorCost(client)), 'Videos pagados × precio por video que le pagás al editor. Esta plata no es tuya — hay que reservarla aunque el editor todavía no haya entregado.')}
-        ${statCard('Margen tuyo', fmtMoney(clientPaidVideosMargin(client)), 'Lo que le cobrás menos lo que hay que guardar para el editor, por los videos ya pagados.')}
+        ${statCard('Videos del trato', client.paidVideoCount||0, 'Cantidad total de videos que incluye este trato, cargado desde "Editar finanzas". No depende de cuánto se cobró ni de cuántos se entregaron.')}
+        ${statCard('Total del trato', fmtMoney(clientPaidVideosRevenue(client)), 'Videos del trato × precio por video que le cobrás. Debería coincidir con "Total a cobrar" de arriba.')}
+        ${statCard('A guardar para el editor', fmtMoney(clientPaidVideosEditorCost(client)), 'Videos del trato × precio por video que le pagás al editor. Esta plata no es tuya — hay que reservarla aunque no se haya cobrado ni entregado todo todavía.')}
+        ${statCard('Margen tuyo', fmtMoney(clientPaidVideosMargin(client)), 'Lo que le cobrás menos lo que hay que guardar para el editor, por el trato completo.')}
       </div>
-      ${ !client.paidVideoCount ? `<p class="field-hint" style="margin-bottom:34px;">Cargá "Videos que ya pagó" y los dos precios por video en "Editar finanzas" para que esto se calcule.</p>` : '' }
+      ${ !client.paidVideoCount ? `<p class="field-hint" style="margin-bottom:34px;">Cargá la "Cantidad de videos del trato" y los dos precios por video en "Editar finanzas" para que esto se calcule.</p>` : '' }
 
       <div class="goal-box" style="margin-bottom:34px;">
         <div class="task-meta">
@@ -2665,9 +2667,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
       <p class="field-hint" id="finance-debt-hint" style="margin-bottom:15px;">${escapeHtml(debtHintText)}</p>
 
-      <label class="field-label" style="display:block; margin-bottom:8px;">Plan de pago por video</label>
+      <label class="field-label" style="display:block; margin-bottom:2px;">Reparto por video (del trato completo)</label>
+      <p class="field-hint" style="margin-top:0; margin-bottom:8px;">Poné el total de videos que incluye el trato — no lo que ya se cobró, eso va arriba.</p>
       <div class="field-row">
-        <div class="field"><label class="field-label">Videos que ya pagó</label><input type="number" min="0" step="1" id="input-finance-paid-videos" value="${client.paidVideoCount || ''}" placeholder="0"></div>
+        <div class="field"><label class="field-label">Cantidad de videos del trato</label><input type="number" min="0" step="1" id="input-finance-paid-videos" value="${client.paidVideoCount || ''}" placeholder="0"></div>
         <div class="field"><label class="field-label">Precio por video (le cobrás)</label><input type="number" min="0" step="0.01" id="input-finance-sale-price" value="${client.salePricePerVideo || ''}" placeholder="0"></div>
       </div>
       <div class="field"><label class="field-label">Precio por video (le pagás al editor)</label><input type="number" min="0" step="0.01" id="input-finance-editor-price" value="${client.editorPricePerVideo || ''}" placeholder="0"></div>
