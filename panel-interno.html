@@ -1951,7 +1951,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>`;
     }).join('');
 
-    const clientFinanceRows = clients.map(c=>{
+    const filteredClients = state.filter.clientStatus ? clients.filter(c => (c.status||'') === state.filter.clientStatus) : clients;
+    const clientFinanceRows = filteredClients.map(c=>{
       const income = Number(c.totalIncome||0);
       const cost = clientEditingCost(c.id);
       const costFraction = income > 0 ? cost / income : (cost > 0 ? 1 : 0);
@@ -1963,6 +1964,22 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <td class="mono">${fmtMoney(clientNetProfit(c))}</td>
         <td>${c.paymentStatus ? escapeHtml(c.paymentStatus) : 'Sin estado'}</td>
       </tr>`;
+    }).join('');
+
+    const editorExpenseRows = state.editors.map(e=>{
+      const myTasks = state.tasks.filter(t=>t.editorId===e.id);
+      const generated = myTasks.reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.pricePerVideo||0),0);
+      const paidAmount = myTasks.reduce((s,t)=>s+taskPaidAmount(t),0);
+      const pending = generated - paidAmount;
+      return `<div class="manage-row">
+        <div class="manage-row-main">
+          ${avatarMark(e.name)}
+          <div>
+            <button class="manage-row-name-btn" data-view-editor="${e.id}">${escapeHtml(e.name)}</button>
+            <div class="sub">Generado ${fmtMoney(generated)} · Pagado ${fmtMoney(paidAmount)} · Pendiente ${fmtMoney(pending)} · Sale de ${e.payoutAccountId ? escapeHtml(paymentAccountName(e.payoutAccountId)) : 'sin cuenta'}</div>
+          </div>
+        </div>
+      </div>`;
     }).join('');
 
     return `
@@ -2005,12 +2022,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="section-head"><div><span class="section-tag">Referentes</span><h2 class="section-title">Referentes</h2></div><button class="btn btn-primary btn-sm" id="btn-new-referrer">+ Nuevo referente</button></div>
       ${ state.referrers.length===0 ? emptyState('Todavía no hay referentes cargados', 'Agregá a las personas que te traen clientes y cobran comisión.') : `<div class="manage-list" style="margin-bottom:34px;">${referrerRows}</div>` }
 
+      <div class="section-head"><div><span class="section-tag">Editores</span><h2 class="section-title">Gastos por editor</h2></div></div>
+      ${ state.editors.length===0 ? emptyState('Todavía no hay editores cargados', 'Agregá editores para ver cuánto se les generó y pagó.') : `<div class="manage-list" style="margin-bottom:34px;">${editorExpenseRows}</div>` }
+
       <div class="section-head"><div><span class="section-tag">Por cliente</span><h2 class="section-title">Detalle financiero</h2></div></div>
-      ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Cuando cargues clientes, su información financiera va a aparecer acá.') : `
+      ${ clients.length > 0 ? `
+      <div class="filter-bar">
+        <select id="filter-client-status">
+          <option value="">Todos los estados</option>
+          ${CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${state.filter.clientStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+        </select>
+      </div>` : '' }
+      ${ clients.length===0 ? emptyState('Todavía no hay clientes', 'Cuando cargues clientes, su información financiera va a aparecer acá.') : (
+        filteredClients.length===0 ? emptyState('Ningún cliente coincide', 'Probá con otro estado o borrá el filtro.') : `
       <table class="data-table">
         <thead><tr><th>Cliente</th><th>Ingreso</th><th>Costo edición</th><th>Ganancia neta</th><th>Estado</th></tr></thead>
         <tbody>${clientFinanceRows}</tbody>
-      </table>` }
+      </table>`) }
     `;
   }
 
