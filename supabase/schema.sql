@@ -107,6 +107,7 @@ create table if not exists public.tasks (
   workflow_status text not null default 'Sin editar' check (workflow_status in ('Sin editar','Editando','Revisión','Listo')),
   deadline        date,
   price_per_video numeric not null default 0,
+  client_price_per_video numeric not null default 0,
   paid            boolean not null default false,
   raw_link         text not null default '',
   edited_link      text not null default '',

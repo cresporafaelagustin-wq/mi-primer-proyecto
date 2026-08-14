@@ -491,6 +491,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       videoCount: Number(r.video_count)||0, videosDone: Number(r.videos_done)||0,
       priority: r.priority || 'media', workflowStatus: r.workflow_status || 'Sin editar',
       deadline: r.deadline || '', pricePerVideo: Number(r.price_per_video)||0,
+      clientPricePerVideo: Number(r.client_price_per_video)||0,
       paid: !!r.paid, rawLink: r.raw_link || '', editedLink: r.edited_link || '',
       scriptLink: r.script_link || '', editReferenceLink: r.edit_reference_link || '', notes: r.notes || ''
     };
@@ -500,7 +501,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       project: t.project, client_id: t.clientId || null, editor_id: t.editorId || null,
       video_count: t.videoCount, videos_done: t.videosDone, priority: t.priority || 'media',
       workflow_status: t.workflowStatus || 'Sin editar',
-      deadline: t.deadline || null, price_per_video: t.pricePerVideo, paid: !!t.paid,
+      deadline: t.deadline || null, price_per_video: t.pricePerVideo,
+      client_price_per_video: t.clientPricePerVideo || 0, paid: !!t.paid,
       raw_link: t.rawLink || '', edited_link: t.editedLink || '', script_link: t.scriptLink || '',
       edit_reference_link: t.editReferenceLink || '', notes: t.notes || ''
     };
@@ -753,6 +755,27 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function clientNetProfitProjected(client){
     // Ganancia neta si todo lo asignado a este cliente se termina y se paga.
     return Number(client.totalIncome||0) - clientRetainedProjected(client);
+  }
+  function clientVideoRevenue(clientId){
+    // Lo que le corresponde cobrar al cliente por los videos YA entregados, según el precio de
+    // venta por video que se cargó en cada tarea (independiente de cuánto pagó el cliente en total).
+    return state.tasks.filter(t=>t.clientId===clientId).reduce((s,t)=>s+Number(t.videosDone||0)*Number(t.clientPricePerVideo||0),0);
+  }
+  function clientVideoRevenueProjected(clientId){
+    // Lo mismo pero contando todos los videos asignados, no solo los entregados.
+    return state.tasks.filter(t=>t.clientId===clientId).reduce((s,t)=>s+Number(t.videoCount||0)*Number(t.clientPricePerVideo||0),0);
+  }
+  function clientVideoMargin(client){
+    // Margen video a video: venta al cliente menos pago al editor menos comisión de referido,
+    // solo por lo ya entregado. Esta es la plata que ya podés considerar tuya de esos videos.
+    const revenue = clientVideoRevenue(client.id);
+    const referrerCut = revenue * Number(client.referrerCommissionPct||0) / 100;
+    return revenue - clientEditingCost(client.id) - referrerCut;
+  }
+  function clientVideoMarginProjected(client){
+    const revenue = clientVideoRevenueProjected(client.id);
+    const referrerCut = revenue * Number(client.referrerCommissionPct||0) / 100;
+    return revenue - clientEditingCostProjected(client.id) - referrerCut;
   }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -1521,7 +1544,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
       <div class="task-meta">
         <span>Entrega <span class="mono">${fmtDate(t.deadline)}</span></span>
-        <span>Precio/video <span class="mono">${fmtMoney(t.pricePerVideo)}</span></span>
+        <span>Precio/video (editor) <span class="mono">${fmtMoney(t.pricePerVideo)}</span></span>
+        ${ isAdmin && t.clientPricePerVideo ? `<span>Precio/video (cliente) <span class="mono">${fmtMoney(t.clientPricePerVideo)}</span></span>` : '' }
       </div>
 
       <div class="field">
@@ -1729,6 +1753,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         ${statCard('Neta sin pagar edición pendiente', fmtMoney(clientNetProfitBeforePayingEditing(client)), 'Cuánto quedaría si todavía no le pagaste al editor lo que ya generó pero sigue pendiente de pago en este cliente.')}
         ${statCard('Ganancia neta (proyectada)', fmtMoney(clientNetProfitProjected(client)), 'Ganancia final estimada si todo lo asignado a este cliente se completa y se cobra/paga.')}
       </div>
+
+      <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Video a video</span><h2 class="section-title">Margen por video</h2></div></div>
+      <div class="stat-grid">
+        ${statCard('Venta por video (generado)', fmtMoney(clientVideoRevenue(client.id)), 'Lo que corresponde cobrarle al cliente por los videos ya entregados, según el precio de venta por video que cargaste en cada tarea.')}
+        ${statCard('Venta por video (proyectada)', fmtMoney(clientVideoRevenueProjected(client.id)), 'Lo mismo pero contando todos los videos asignados a este cliente, no solo los ya entregados.')}
+        ${statCard('Margen por video (generado)', fmtMoney(clientVideoMargin(client)), 'Venta por video ya entregado, menos lo que le pagás al editor por esos videos, menos la comisión del referido. Esto ya es tuyo.')}
+        ${statCard('Margen por video (proyectado)', fmtMoney(clientVideoMarginProjected(client)), 'Lo mismo pero si se completan todos los videos asignados a este cliente.')}
+      </div>
+      ${ (clientVideoRevenue(client.id) === 0 && clientVideoRevenueProjected(client.id) === 0) ? `<p class="field-hint" style="margin-bottom:34px;">Cargá el "Precio por video (lo que le cobrás al cliente)" en cada tarea de este cliente para que este cálculo funcione.</p>` : '' }
+
       <div class="goal-box" style="margin-bottom:34px;">
         <div class="task-meta">
           <span>Cobrado en <span class="mono">${client.paymentAccountId ? escapeHtml(paymentAccountName(client.paymentAccountId)) : 'sin cuenta asignada'}</span></span>
@@ -2768,6 +2802,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="field"><label class="field-label">Precio por video (a favor del editor)</label><input type="number" min="0" step="0.01" id="input-task-price" value="${src?src.pricePerVideo:0}"></div>
       </div>
       <div class="field">
+        <label class="field-label">Precio por video (lo que le cobrás al cliente)</label>
+        <input type="number" min="0" step="0.01" id="input-task-client-price" value="${src?src.clientPricePerVideo||0:0}">
+        <p class="field-hint">Opcional — cargalo si este proyecto tiene un precio de venta por video definido, para calcular el margen real (venta − pago al editor) en la ficha del cliente.</p>
+      </div>
+      <div class="field">
         <label class="field-label">Estado de edición</label>
         <select id="input-task-workflow">
           ${TASK_WORKFLOW_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${src&&src.workflowStatus===s?'selected':(!src&&s==='Sin editar'?'selected':'')}>${escapeHtml(s)}</option>`).join('')}
@@ -3107,6 +3146,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         workflowStatus: document.getElementById('input-task-workflow').value || 'Sin editar',
         deadline: document.getElementById('input-task-deadline').value,
         pricePerVideo: Number(document.getElementById('input-task-price').value) || 0,
+        clientPricePerVideo: Number(document.getElementById('input-task-client-price').value) || 0,
         videosDone: Number(document.getElementById('input-task-done').value) || 0,
         paid: document.getElementById('input-task-paid').checked,
         rawLink: document.getElementById('input-task-raw').value.trim(),
