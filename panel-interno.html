@@ -1601,7 +1601,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     const taskRows = clientTasks.map(t=>`
       <tr>
-        <td>${escapeHtml(t.project)}</td>
+        <td><button type="button" class="table-link-btn" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}</button></td>
         <td>${escapeHtml(editorName(t.editorId))}</td>
         <td>${statusLabel(taskStatus(t))}</td>
         ${ isAdmin ? `
