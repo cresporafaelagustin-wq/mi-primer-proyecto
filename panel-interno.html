@@ -198,18 +198,27 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
 /* ============ KANBAN BOARD (por estado de edición) ============ */
 .kanban-board{ display:flex; gap:16px; align-items:flex-start; overflow-x:auto; padding-bottom:10px; }
-.kanban-column{ flex:1 1 300px; min-width:280px; max-width:360px; display:flex; flex-direction:column; gap:14px; }
+.kanban-column{
+  flex:1 1 300px; min-width:280px; max-width:360px; display:flex; flex-direction:column; gap:8px;
+  transition: outline-color .12s ease;
+  outline:2px dashed transparent; outline-offset:6px;
+}
+.kanban-column.drag-over{ outline-color:var(--ink); }
 .kanban-col-head{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid var(--ink); padding-bottom:10px; margin-bottom:2px; }
 .kanban-col-title{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink); }
 .kanban-col-count{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-soft); }
-.kanban-empty{ border:1px dashed var(--paper-line); padding:24px 14px; text-align:center; font-size:12px; color:var(--ink-soft); }
-.kanban-column{ gap:8px; }
+.kanban-column-drop{ display:flex; flex-direction:column; gap:8px; flex:1; min-height:90px; }
+.kanban-empty{
+  border:1px dashed var(--paper-line); padding:24px 14px; text-align:center; font-size:12px; color:var(--ink-soft);
+  flex:1; display:flex; align-items:center; justify-content:center;
+}
 .kanban-card{
   display:block; width:100%; text-align:left; background:var(--paper); border:1px solid var(--paper-line);
   padding:14px 16px; font-family:'Playfair Display', serif; font-weight:600; font-size:14.5px; color:var(--ink);
-  cursor:pointer; transition:border-color .12s, background .12s;
+  cursor:grab; transition:border-color .12s, background .12s, opacity .12s;
 }
 .kanban-card:hover{ border-color:var(--ink); background:var(--paper-line); }
+.kanban-card.dragging{ opacity:0.35; cursor:grabbing; }
 
 /* ============ MODAL DE DETALLE DE TAREA ============ */
 .task-detail-inner .task-card{ border:none; padding:0; gap:16px; }
@@ -530,6 +539,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   async function withBusy(fn){
     try{ await fn(); }
     catch(e){ alert('No se pudo completar la acción: ' + (e && e.message ? e.message : e)); }
+  }
+
+  function updateWorkflowStatus(id, status){
+    return withBusy(async () => {
+      const { error } = await supabase.from('tasks').update({ workflow_status: status }).eq('id', id);
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
   }
 
   /* ================= AUTH ================= */
@@ -1298,12 +1316,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       const colTasks = tasks.filter(t=>(t.workflowStatus||'Sin editar')===status);
       const cards = colTasks.map(t=>renderTaskKanbanCard(t, isAdmin)).join('');
       return `
-        <div class="kanban-column">
+        <div class="kanban-column" data-kanban-status="${escapeHtml(status)}">
           <div class="kanban-col-head">
             <span class="kanban-col-title">${escapeHtml(status)}</span>
             <span class="kanban-col-count">${colTasks.length}</span>
           </div>
-          ${ colTasks.length === 0 ? `<div class="kanban-empty">Sin tareas</div>` : cards }
+          <div class="kanban-column-drop">
+          ${ colTasks.length === 0 ? `<div class="kanban-empty">Soltá una tarea acá</div>` : cards }
+          </div>
         </div>`;
     }).join('');
 
@@ -1366,7 +1386,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderTaskKanbanCard(t, isAdmin){
-    return `<button type="button" class="kanban-card" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}</button>`;
+    return `<button type="button" class="kanban-card" draggable="true" data-drag-task="${t.id}" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}</button>`;
   }
 
   function renderTaskDetailModal(id, isAdmin){
@@ -2090,12 +2110,31 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     });
 
     document.querySelectorAll('[data-workflow-id]').forEach(select=>{
-      select.onchange = () => withBusy(async () => {
-        const id = select.getAttribute('data-workflow-id');
-        const { error } = await supabase.from('tasks').update({ workflow_status: select.value }).eq('id', id);
-        if(error) throw error;
-        await reloadData();
-        render();
+      select.onchange = () => updateWorkflowStatus(select.getAttribute('data-workflow-id'), select.value);
+    });
+
+    let draggedTaskId = null;
+    document.querySelectorAll('.kanban-card[data-drag-task]').forEach(card=>{
+      card.addEventListener('dragstart', (e)=>{
+        draggedTaskId = card.getAttribute('data-drag-task');
+        card.classList.add('dragging');
+        if(e.dataTransfer){ e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', draggedTaskId); }
+      });
+      card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggedTaskId = null; });
+    });
+    document.querySelectorAll('.kanban-column[data-kanban-status]').forEach(col=>{
+      col.addEventListener('dragover', (e)=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect = 'move'; col.classList.add('drag-over'); });
+      col.addEventListener('dragleave', (e)=>{ if(!col.contains(e.relatedTarget)) col.classList.remove('drag-over'); });
+      col.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        const id = draggedTaskId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+        const status = col.getAttribute('data-kanban-status');
+        draggedTaskId = null;
+        if(!id || !status) return;
+        const t = state.tasks.find(x=>x.id===id);
+        if(!t || t.workflowStatus === status) return;
+        updateWorkflowStatus(id, status);
       });
     });
 
