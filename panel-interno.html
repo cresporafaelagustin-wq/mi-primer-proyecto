@@ -189,6 +189,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .data-table td{ padding:13px 15px; border-bottom:1px solid var(--paper-line); font-size:13.5px; }
 .data-table tr:last-child td{ border-bottom:none; }
 .data-table td.mono{ font-family:'IBM Plex Mono',monospace; text-transform:none; letter-spacing:0; }
+.table-link-btn{ background:none; border:none; padding:0; margin:0; font:inherit; color:var(--ink); cursor:pointer; text-align:left; }
+.table-link-btn:hover{ text-decoration:underline; }
 
 /* ============ FILTER BAR ============ */
 .filter-bar{ display:flex; gap:0; flex-wrap:wrap; margin-bottom:20px; border:1px solid var(--paper-line); }
@@ -1667,10 +1669,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     const taskRows = myTasks.map(t=>`
       <tr>
-        <td>${escapeHtml(t.project)}</td>
+        <td><button type="button" class="table-link-btn" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}</button></td>
         <td>${escapeHtml(clientName(t.clientId))}</td>
         <td>${statusLabel(taskStatus(t))}</td>
         <td>${escapeHtml(t.workflowStatus||'Sin editar')}</td>
+        <td>${ t.editedLink ? `<a class="open-link" href="${escapeHtml(t.editedLink)}" target="_blank" rel="noopener">Abrir</a>` : `<span style="color:var(--ink-soft); font-size:12.5px;">Sin cargar</span>` }</td>
+        <td class="mono">${fmtMoney(t.pricePerVideo)}</td>
         <td class="mono">${fmtDate(t.deadline)}</td>
       </tr>
     `).join('');
@@ -1752,7 +1756,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="section-head"><div><span class="section-tag">Historial</span><h2 class="section-title">Tareas de ${escapeHtml(editor.name)}</h2></div></div>
       ${ myTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se le asigne una tarea a este editor, va a aparecer acá.') : `
       <table class="data-table">
-        <thead><tr><th>Proyecto</th><th>Cliente</th><th>Estado</th><th>Edición</th><th>Entrega</th></tr></thead>
+        <thead><tr><th>Proyecto</th><th>Cliente</th><th>Estado</th><th>Edición</th><th>Video</th><th>Precio/video</th><th>Entrega</th></tr></thead>
         <tbody>${taskRows}</tbody>
       </table>` }
     `;
