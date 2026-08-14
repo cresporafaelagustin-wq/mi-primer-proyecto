@@ -1848,6 +1848,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
       <div class="section-head"><div><span class="section-tag">Historial</span><h2 class="section-title">Tareas de ${escapeHtml(editor.name)}</h2></div></div>
       ${ myTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se le asigne una tarea a este editor, va a aparecer acá.') : `
+      <div class="goal-box" style="margin-bottom:20px;">
+        <div class="task-meta">
+          <span>Generado <span class="mono">${fmtMoney(earned)}</span></span>
+          <span>Pagado <span class="mono">${fmtMoney(paidAmount)}</span></span>
+          <span>Hay que pagarle <span class="mono">${fmtMoney(earned - paidAmount)}</span></span>
+        </div>
+      </div>
       <table class="data-table">
         <thead><tr><th>Proyecto</th><th>Cliente</th><th>Estado</th><th>Edición</th><th>Video</th><th>Precio/video</th><th>Entrega</th></tr></thead>
         <tbody>${taskRows}</tbody>
