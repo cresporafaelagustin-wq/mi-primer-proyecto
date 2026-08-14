@@ -399,6 +399,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     referrers: [],
     paymentAccounts: [],
     fixedExpenses: [],
+    taskRequests: [],
     financeSettings: { ownerSharePct: 70 },
     notifySettings: { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE },
     currentUser: null,
@@ -465,6 +466,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function fixedExpenseFromRow(r){
     return { id: r.id, name: r.name, cost: Number(r.cost)||0, payoutAccountId: r.payout_account_id || '' };
   }
+  function taskRequestFromRow(r){
+    return {
+      id: r.id, clientId: r.client_id, project: r.project,
+      videoCount: Number(r.video_count)||0, deadline: r.deadline || '',
+      notes: r.notes || '', status: r.status || 'Pendiente', createdAt: r.created_at
+    };
+  }
   function clientFinanceFromRow(r){
     return {
       totalCharge: Number(r.total_charge)||0, totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
@@ -480,7 +488,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       id: r.id, name: r.name, status: r.status || '',
       instagramLink: r.instagram_link || '', driveLink: r.drive_link || '',
       trackerLink: r.tracker_link || '', referenceLink: r.reference_link || '',
-      brandManualLink: r.brand_manual_link || '',
+      brandManualLink: r.brand_manual_link || '', email: r.email || '',
       contractLink: '', // se completa aparte solo para admin (ver reloadData) — no viene en esta tabla
       totalCharge: 0, totalIncome: 0, gatewayFee: 0, referrerId: '', referrerCommissionPct: 0,
       referrerPaid: false, paymentAccountId: '', paymentStatus: '', amountOwed: 0,
@@ -511,6 +519,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   async function reloadData(){
+    if(state.currentUser && state.currentUser.type === 'client'){
+      const [ownClientRes, requestsRes] = await Promise.all([
+        supabase.from('clients').select('*').eq('id', state.currentUser.id).maybeSingle(),
+        supabase.from('task_requests').select('*').eq('client_id', state.currentUser.id).order('created_at', { ascending: false })
+      ]);
+      state.clients = ownClientRes.data ? [clientFromRow(ownClientRes.data)] : [];
+      state.taskRequests = (requestsRes.data || []).map(taskRequestFromRow);
+      return;
+    }
+
     const [editorsRes, clientsRes, tasksRes] = await Promise.all([
       supabase.from('editors').select('*').order('name'),
       supabase.from('clients').select('*').order('name'),
@@ -521,7 +539,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     state.tasks = (tasksRes.data || []).map(taskFromRow);
 
     if(state.currentUser && state.currentUser.type === 'admin' && state.session){
-      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes, taskPricesRes] = await Promise.all([
+      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes, taskPricesRes, requestsRes] = await Promise.all([
         supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
         supabase.from('client_contracts').select('*'),
         supabase.from('payment_accounts').select('*').order('name'),
@@ -529,8 +547,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         supabase.from('fixed_expenses').select('*').order('name'),
         supabase.from('client_finance').select('*'),
         supabase.from('finance_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
-        supabase.from('task_client_price').select('*')
+        supabase.from('task_client_price').select('*'),
+        supabase.from('task_requests').select('*').order('created_at', { ascending: false })
       ]);
+      state.taskRequests = (requestsRes.data || []).map(taskRequestFromRow);
       state.notifySettings = ns.data
         ? { email: ns.data.email || '', phone: ns.data.phone || '', template: ns.data.template || DEFAULT_ALERT_TEMPLATE }
         : { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE };
@@ -639,6 +659,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       state.currentUser = { type: 'admin' };
     } else if(profile.role === 'editor' && profile.editor_id){
       state.currentUser = { type: 'editor', id: profile.editor_id };
+    } else if(profile.role === 'client' && profile.client_id){
+      state.currentUser = { type: 'client', id: profile.client_id };
     } else {
       state.currentUser = { type: 'unlinked' };
     }
@@ -832,6 +854,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     }
     if(!state.currentUser){ app.innerHTML = renderLogin(); attachLoginEvents(); return; }
     if(state.currentUser.type === 'unlinked'){ app.innerHTML = renderUnlinked(); attachUnlinkedEvents(); return; }
+    if(state.currentUser.type === 'client'){ app.innerHTML = renderClientPortal(); attachClientPortalEvents(); return; }
     let html = renderShell();
     if(state.modal){ html += renderModal(); }
     app.innerHTML = html;
@@ -926,6 +949,76 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(btn) btn.onclick = () => withBusy(doLogout);
   }
 
+  const REQUEST_STATUS_LABEL = { 'Pendiente': 'Pendiente de revisión', 'Convertida': 'Aceptado, ya es una tarea', 'Descartada': 'No se va a hacer' };
+
+  function renderClientPortal(){
+    const client = state.clients.find(c=>c.id===state.currentUser.id);
+    const clientName = client ? client.name : '';
+    const requests = state.taskRequests || [];
+    const rows = requests.map(r => `
+      <div class="task-card" style="margin-bottom:12px;">
+        <div class="task-top">
+          <div><strong>${escapeHtml(r.project)}</strong></div>
+          <span class="status-tag">${escapeHtml(REQUEST_STATUS_LABEL[r.status] || r.status)}</span>
+        </div>
+        <div class="task-meta">
+          <span>${r.videoCount} video${r.videoCount===1?'':'s'}</span>
+          ${ r.deadline ? `<span>Entrega deseada: ${fmtDate(r.deadline)}</span>` : '' }
+        </div>
+        ${ r.notes ? `<p class="empty-note" style="margin:8px 0 0;">${escapeHtml(r.notes)}</p>` : '' }
+      </div>`).join('');
+
+    return `
+    <div class="login-screen">
+      <div class="login-card" style="max-width:560px;">
+        <div class="login-wordmark">SCA</div>
+        <span class="section-tag">Portal de cliente</span>
+        <h1 class="login-title">Hola, ${escapeHtml(clientName)}</h1>
+        <p class="login-sub">Cargá acá los videos que necesitás. Lo revisamos y te los agendamos.</p>
+
+        <div class="field"><label class="field-label">¿Qué necesitás? (proyecto/nombre del pedido)</label><input type="text" id="input-request-project" placeholder="Ej: Videos de la campaña de agosto"></div>
+        <div class="field-row">
+          <div class="field"><label class="field-label">Cantidad de videos</label><input type="number" min="1" step="1" id="input-request-video-count" placeholder="1"></div>
+          <div class="field"><label class="field-label">Fecha límite deseada (opcional)</label><input type="date" id="input-request-deadline"></div>
+        </div>
+        <div class="field"><label class="field-label">Notas / detalles</label><textarea id="input-request-notes" rows="3" placeholder="Contexto, referencias, lo que haga falta..."></textarea></div>
+        <p class="login-error" id="request-error" style="display:none;"></p>
+        <div class="role-list"><button class="role-btn admin-btn" id="btn-send-request">Enviar pedido</button></div>
+
+        ${ requests.length ? `
+        <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Tus pedidos</h2>
+        ${rows}` : '' }
+
+        <p class="empty-note" style="margin-top:24px;"><a href="#" id="btn-logout-client">Salir</a></p>
+      </div>
+    </div>`;
+  }
+
+  function attachClientPortalEvents(){
+    const logoutBtn = document.getElementById('btn-logout-client');
+    if(logoutBtn) logoutBtn.onclick = (e) => { e.preventDefault(); withBusy(doLogout); };
+    const sendBtn = document.getElementById('btn-send-request');
+    if(sendBtn) sendBtn.onclick = () => withBusy(async () => {
+      const errorEl = document.getElementById('request-error');
+      errorEl.style.display = 'none';
+      const project = document.getElementById('input-request-project').value.trim();
+      const videoCount = Number(document.getElementById('input-request-video-count').value) || 0;
+      const deadline = document.getElementById('input-request-deadline').value || null;
+      const notes = document.getElementById('input-request-notes').value.trim();
+      if(!project || videoCount < 1){
+        errorEl.textContent = 'Contanos qué necesitás y cuántos videos son.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      const { error } = await supabase.from('task_requests').insert({
+        client_id: state.currentUser.id, project, video_count: videoCount, deadline, notes
+      });
+      if(error) throw error;
+      await reloadData();
+      render();
+    });
+  }
+
   const NAV_ICON_PATHS = {
     resumen: '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect>',
     tareas: '<line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="14" y2="18"></line>',
@@ -933,6 +1026,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     alertas: '<path d="M12 3 L22 20 L2 20 Z"></path><line x1="12" y1="9.5" x2="12" y2="14"></line><circle cx="12" cy="16.8" r="0.9" fill="currentColor" stroke="none"></circle>',
     editores: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"></path>',
     clientes: '<rect x="3" y="8" width="18" height="12"></rect><path d="M8 8V6a4 4 0 0 1 8 0v2"></path>',
+    pedidos: '<path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"></path><path d="M12 22 L12 12 M3 7 L12 12 L21 7"></path>',
     finanzas: '<polyline points="3,17 9,11 13,15 21,5"></polyline><polyline points="15,5 21,5 21,11"></polyline>',
     'mis-proyecciones': '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle>',
     archivo: '<rect x="3" y="4" width="18" height="5"></rect><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"></path><line x1="10" y1="13" x2="14" y2="13"></line>',
@@ -948,7 +1042,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const isAdmin = state.currentUser.type === 'admin';
     const previewing = isAdmin && isPreviewMode();
     const userLabel = isAdmin ? (previewing ? `Viendo como ${editorName(state.viewAsEditorId)}` : 'Administrador') : editorName(state.currentUser.id);
-    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['archivo','Archivo'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
+    const pendingRequestCount = (state.taskRequests||[]).filter(r=>r.status==='Pendiente').length;
+    const pedidosLabel = 'Pedidos' + (pendingRequestCount ? ` (${pendingRequestCount})` : '');
+    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['archivo','Archivo'],['pedidos',pedidosLabel],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
     const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mi-archivo','Archivo'],['mis-proyecciones','Mis proyecciones']];
     const tabs = (isAdmin && !previewing) ? adminTabs : editorTabs;
     const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${navIcon(key)}<span class="sidebar-hide-label">${label}</span></button>`).join('');
@@ -1012,6 +1108,39 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       };
     });
     attachContentEvents();
+  }
+
+  function renderPedidos(){
+    const requests = [...(state.taskRequests||[])].sort((a,b)=>{
+      if(a.status==='Pendiente' && b.status!=='Pendiente') return -1;
+      if(b.status==='Pendiente' && a.status!=='Pendiente') return 1;
+      return (b.createdAt||'').localeCompare(a.createdAt||'');
+    });
+    if(!requests.length) return emptyState('Todavía no hay pedidos', 'Cuando un cliente con acceso al portal cargue un pedido, va a aparecer acá para que lo conviertas en tarea.');
+    const cards = requests.map(r => `
+      <div class="task-card">
+        <div class="task-top">
+          <div>
+            <div class="task-project">${escapeHtml(r.project)}</div>
+            <div class="task-client">${escapeHtml(clientName(r.clientId))}</div>
+          </div>
+          <span class="status-tag">${escapeHtml(REQUEST_STATUS_LABEL[r.status] || r.status)}</span>
+        </div>
+        <div class="task-meta">
+          <span>${r.videoCount} video${r.videoCount===1?'':'s'}</span>
+          ${ r.deadline ? `<span>Entrega deseada: ${fmtDate(r.deadline)}</span>` : '' }
+          <span>Pedido el ${fmtDate((r.createdAt||'').slice(0,10))}</span>
+        </div>
+        ${ r.notes ? `<p style="margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5;">${escapeHtml(r.notes)}</p>` : '' }
+        ${ r.status === 'Pendiente' ? `
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" data-convert-request="${r.id}">Convertir en tarea</button>
+          <button class="btn btn-ghost btn-sm" data-discard-request="${r.id}">Descartar</button>
+        </div>` : '' }
+      </div>`).join('');
+    return `
+      <div class="section-head"><div><span class="section-tag">Portal de cliente</span><h2 class="section-title">Pedidos</h2></div></div>
+      <div class="task-grid">${cards}</div>`;
   }
 
   function buildAlertMessage(t){
@@ -1096,6 +1225,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(state.activeTab === 'resumen') return renderResumen();
     if(state.activeTab === 'tareas') return renderTareas(true);
     if(state.activeTab === 'archivo') return renderArchivo(true);
+    if(state.activeTab === 'pedidos') return renderPedidos();
     if(state.activeTab === 'alertas') return renderAlertas();
     if(state.activeTab === 'editores') return renderEditoresManage();
     if(state.activeTab === 'clientes') return renderClientesManage();
@@ -2401,6 +2531,24 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         render();
       };
     });
+    document.querySelectorAll('[data-convert-request]').forEach(btn=>{
+      btn.onclick = () => {
+        const r = (state.taskRequests||[]).find(x=>x.id===btn.getAttribute('data-convert-request'));
+        if(!r) return;
+        const seed = { project: r.project, clientId: r.clientId, videoCount: r.videoCount, deadline: r.deadline, notes: r.notes, pricePerVideo: 0, videosDone: 0 };
+        state.modal = { kind:'task', data: null, restrictEditorId: null, seed, convertRequestId: r.id };
+        render();
+      };
+    });
+    document.querySelectorAll('[data-discard-request]').forEach(btn=>{
+      btn.onclick = () => askConfirm('¿Descartar este pedido? El cliente va a ver que no se va a hacer.', () => withBusy(async () => {
+        const id = btn.getAttribute('data-discard-request');
+        const { error } = await supabase.from('task_requests').update({ status: 'Descartada' }).eq('id', id);
+        if(error) throw error;
+        await reloadData();
+        render();
+      }));
+    });
     document.querySelectorAll('[data-toggle-paid]').forEach(btn=>{
       btn.onclick = () => withBusy(async () => {
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-toggle-paid'));
@@ -2819,6 +2967,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="field"><label class="field-label">Estado</label><select id="input-client-status"><option value="">Sin estado</option>${statusOptions}</select></div>
       <p class="field-hint">El estado de pago y lo que se le cobra a este cliente se cargan desde "Editar finanzas" en su ficha.</p>
 
+      <div class="field">
+        <label class="field-label">Email de acceso (opcional)</label>
+        <input type="email" id="input-client-email" value="${escapeHtml(data?data.email||'':'')}" placeholder="cliente@ejemplo.com">
+        <p class="field-hint">Si lo cargás, este cliente va a poder entrar al panel con este email para pedir videos nuevos. No ve precios, editores ni datos de otros clientes.</p>
+      </div>
+
       <div class="field"><label class="field-label">Instagram</label><input type="text" id="input-client-instagram" value="${escapeHtml(data?data.instagramLink||'':'')}" placeholder="https://instagram.com/..."></div>
       <div class="field"><label class="field-label">Drive</label><input type="text" id="input-client-drive" value="${escapeHtml(data?data.driveLink||'':'')}" placeholder="https://drive.google.com/..."></div>
       <div class="field"><label class="field-label">Tracker del cliente</label><input type="text" id="input-client-tracker" value="${escapeHtml(data?data.trackerLink||'':'')}" placeholder="https://..."></div>
@@ -3023,9 +3177,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(saveClientBtn) saveClientBtn.onclick = () => withBusy(async () => {
       const name = document.getElementById('input-client-name').value.trim();
       if(!name) return;
+      const email = document.getElementById('input-client-email').value.trim().toLowerCase();
       const payload = {
         name,
         status: document.getElementById('input-client-status').value,
+        email: email || null,
         instagram_link: document.getElementById('input-client-instagram').value.trim(),
         drive_link: document.getElementById('input-client-drive').value.trim(),
         tracker_link: document.getElementById('input-client-tracker').value.trim(),
@@ -3042,6 +3198,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         const { data: inserted, error } = await supabase.from('clients').insert(payload).select().single();
         if(error) throw error;
         clientId = inserted.id;
+      }
+      if(email){
+        await supabase.from('profiles').update({ client_id: clientId, role: 'client' }).eq('email', email).is('client_id', null);
       }
       const { error: contractError } = await supabase.from('client_contracts')
         .upsert({ client_id: clientId, contract_link: contractLink }, { onConflict: 'client_id' });
@@ -3304,6 +3463,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           const { error } = await supabase.from('tasks').delete().eq('id', inserted.id);
           if(error) throw error;
         });
+        if(inserted && state.modal.convertRequestId){
+          const { error: reqError } = await supabase.from('task_requests').update({ status: 'Convertida' }).eq('id', state.modal.convertRequestId);
+          if(reqError) throw reqError;
+        }
       }
       closeModal();
       await reloadData();

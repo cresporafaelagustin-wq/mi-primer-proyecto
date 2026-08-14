@@ -51,6 +51,7 @@ create table if not exists public.clients (
   tracker_link       text not null default '',
   reference_link     text not null default '',
   brand_manual_link  text not null default '',
+  email              text unique,
   created_at         timestamptz not null default now()
 );
 
@@ -131,6 +132,21 @@ create table if not exists public.task_client_price (
   updated_at              timestamptz not null default now()
 );
 
+-- Pedidos que carga un cliente desde su propio portal (login por email, sin
+-- contraseña). No es una tarea todavía: el admin lo revisa en la pestaña
+-- "Pedidos" y recién ahí lo convierte en una tarea real, asignándole editor
+-- y precio. Así un cliente nunca ve ni toca la tabla de tareas.
+create table if not exists public.task_requests (
+  id           uuid primary key default gen_random_uuid(),
+  client_id    uuid not null references public.clients(id) on delete cascade,
+  project      text not null,
+  video_count  integer not null default 0,
+  deadline     date,
+  notes        text not null default '',
+  status       text not null default 'Pendiente' check (status in ('Pendiente','Convertida','Descartada')),
+  created_at   timestamptz not null default now()
+);
+
 -- Un admin puede tener su propia config de alertas (email/telefono/plantilla).
 create table if not exists public.notify_settings (
   owner_id   uuid primary key references auth.users(id) on delete cascade,
@@ -152,12 +168,14 @@ create table if not exists public.admin_emails (
   email text primary key
 );
 
--- Une cada usuario de Supabase Auth con su rol y (si es editor) su fila en editors.
+-- Une cada usuario de Supabase Auth con su rol y (si es editor o cliente)
+-- su fila en editors/clients.
 create table if not exists public.profiles (
   id         uuid primary key references auth.users(id) on delete cascade,
   email      text not null,
-  role       text not null default 'editor' check (role in ('admin','editor')),
+  role       text not null default 'editor' check (role in ('admin','editor','client')),
   editor_id  uuid references public.editors(id) on delete set null,
+  client_id  uuid references public.clients(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -180,6 +198,7 @@ as $$
 declare
   v_role text := 'editor';
   v_editor_id uuid;
+  v_client_id uuid;
 begin
   if exists (select 1 from public.admin_emails a where lower(a.email) = lower(new.email)) then
     v_role := 'admin';
@@ -187,8 +206,15 @@ begin
 
   select id into v_editor_id from public.editors e where lower(e.email) = lower(new.email);
 
-  insert into public.profiles (id, email, role, editor_id)
-  values (new.id, new.email, v_role, v_editor_id)
+  if v_role = 'editor' and v_editor_id is null then
+    select id into v_client_id from public.clients c where lower(c.email) = lower(new.email);
+    if v_client_id is not null then
+      v_role := 'client';
+    end if;
+  end if;
+
+  insert into public.profiles (id, email, role, editor_id, client_id)
+  values (new.id, new.email, v_role, v_editor_id, v_client_id)
   on conflict (id) do update set email = excluded.email;
 
   return new;
@@ -224,6 +250,16 @@ as $$
   select editor_id from public.profiles where id = auth.uid();
 $$;
 
+create or replace function public.current_client_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select client_id from public.profiles where id = auth.uid();
+$$;
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
@@ -238,6 +274,7 @@ alter table public.client_finance enable row level security;
 alter table public.finance_settings enable row level security;
 alter table public.tasks enable row level security;
 alter table public.task_client_price enable row level security;
+alter table public.task_requests enable row level security;
 alter table public.notify_settings enable row level security;
 alter table public.admin_emails enable row level security;
 alter table public.profiles enable row level security;
@@ -264,6 +301,10 @@ create policy "admin full access clients" on public.clients
 drop policy if exists "editor read clients" on public.clients;
 create policy "editor read clients" on public.clients
   for select using (public.current_role() = 'editor');
+
+drop policy if exists "client read own row" on public.clients;
+create policy "client read own row" on public.clients
+  for select using (id = public.current_client_id());
 
 -- client_contracts: solo admin, ni lectura para editores. Esto es lo que
 -- realmente oculta el contrato — no una decisión de la pantalla.
@@ -292,6 +333,20 @@ create policy "editor update own tasks" on public.tasks
 drop policy if exists "editor delete own tasks" on public.tasks;
 create policy "editor delete own tasks" on public.tasks
   for delete using (editor_id = public.current_editor_id());
+
+-- task_requests: admin puede todo (revisarlos y convertirlos en tareas);
+-- un cliente solo puede crear y leer los pedidos que él mismo cargó.
+drop policy if exists "admin full access task_requests" on public.task_requests;
+create policy "admin full access task_requests" on public.task_requests
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "client insert own task_requests" on public.task_requests;
+create policy "client insert own task_requests" on public.task_requests
+  for insert with check (client_id = public.current_client_id());
+
+drop policy if exists "client read own task_requests" on public.task_requests;
+create policy "client read own task_requests" on public.task_requests
+  for select using (client_id = public.current_client_id());
 
 -- notify_settings: cada admin ve y edita solo su propia configuración.
 drop policy if exists "owner manage notify settings" on public.notify_settings;
