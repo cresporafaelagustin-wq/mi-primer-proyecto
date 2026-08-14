@@ -1604,6 +1604,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <td>${escapeHtml(t.project)}</td>
         <td>${escapeHtml(editorName(t.editorId))}</td>
         <td>${statusLabel(taskStatus(t))}</td>
+        ${ isAdmin ? `
+        <td class="mono">${t.videosDone||0}/${t.videoCount||0}</td>
+        <td class="mono">${fmtMoney(t.pricePerVideo)}</td>
+        <td class="mono">${fmtMoney(Number(t.videosDone||0)*Number(t.pricePerVideo||0))}</td>` : '' }
         <td class="mono">${fmtDate(t.deadline)}</td>
       </tr>
     `).join('');
@@ -1659,7 +1663,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="section-head"><div><span class="section-tag">Historial</span><h2 class="section-title">Tareas de este cliente</h2></div></div>
       ${ clientTasks.length === 0 ? emptyState('Sin tareas todavía', 'Cuando se cree una tarea para este cliente, va a aparecer acá.') : `
       <table class="data-table">
-        <thead><tr><th>Proyecto</th><th>Editor</th><th>Estado</th><th>Entrega</th></tr></thead>
+        <thead><tr><th>Proyecto</th><th>Editor</th><th>Estado</th>${ isAdmin ? `<th>Videos</th><th>Precio/video</th><th>Costo</th>` : '' }<th>Entrega</th></tr></thead>
         <tbody>${taskRows}</tbody>
       </table>` }
     `;
