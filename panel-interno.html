@@ -479,7 +479,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       priority: r.priority || 'media', workflowStatus: r.workflow_status || 'Sin editar',
       deadline: r.deadline || '', pricePerVideo: Number(r.price_per_video)||0,
       paid: !!r.paid, rawLink: r.raw_link || '', editedLink: r.edited_link || '',
-      scriptLink: r.script_link || '', notes: r.notes || ''
+      scriptLink: r.script_link || '', editReferenceLink: r.edit_reference_link || '', notes: r.notes || ''
     };
   }
   function taskToRow(t){
@@ -489,7 +489,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       workflow_status: t.workflowStatus || 'Sin editar',
       deadline: t.deadline || null, price_per_video: t.pricePerVideo, paid: !!t.paid,
       raw_link: t.rawLink || '', edited_link: t.editedLink || '', script_link: t.scriptLink || '',
-      notes: t.notes || ''
+      edit_reference_link: t.editReferenceLink || '', notes: t.notes || ''
     };
   }
 
@@ -1484,6 +1484,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           <input type="text" placeholder="Link del material editado" value="${escapeHtml(t.editedLink||'')}" data-link-id="${t.id}" data-link-type="editedLink">
           ${ t.editedLink ? `<a class="open-link" href="${escapeHtml(t.editedLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
         </div>
+        <div class="link-row">
+          <span class="field-label-inline">Referente</span>
+          <input type="text" placeholder="Link de referencia de edición (si tiene)" value="${escapeHtml(t.editReferenceLink||'')}" data-link-id="${t.id}" data-link-type="editReferenceLink">
+          ${ t.editReferenceLink ? `<a class="open-link" href="${escapeHtml(t.editReferenceLink)}" target="_blank" rel="noopener">Abrir</a>` : '' }
+        </div>
       </div>
 
       ${ t.notes ? `<p style="margin:0; font-size:12.5px; color:var(--ink-soft); line-height:1.5; border-top:1px solid var(--paper-line); padding-top:10px;">${escapeHtml(t.notes)}</p>` : '' }
@@ -2280,7 +2285,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         const type = input.getAttribute('data-link-type');
         if(!t) return;
         const value = input.value.trim();
-        const columnByType = { rawLink: 'raw_link', editedLink: 'edited_link', scriptLink: 'script_link' };
+        const columnByType = { rawLink: 'raw_link', editedLink: 'edited_link', scriptLink: 'script_link', editReferenceLink: 'edit_reference_link' };
         const column = columnByType[type] || 'edited_link';
         const { error } = await supabase.from('tasks').update({ [column]: value }).eq('id', t.id);
         if(error) throw error;
@@ -2572,6 +2577,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="field"><label class="field-label">Link material crudo</label><input type="text" id="input-task-raw" value="${escapeHtml(src?src.rawLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Link del guión (si tiene)</label><input type="text" id="input-task-script" value="${escapeHtml(src?src.scriptLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Link material editado</label><input type="text" id="input-task-edited" value="${escapeHtml(src?src.editedLink||'':'')}" placeholder="https://..."></div>
+      <div class="field"><label class="field-label">Referente de edición (si tiene)</label><input type="text" id="input-task-edit-reference" value="${escapeHtml(src?src.editReferenceLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Notas</label><textarea id="input-task-notes" rows="3" placeholder="Contexto, pedidos del cliente, aprobaciones pendientes...">${escapeHtml(src?src.notes||'':'')}</textarea></div>
       <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-task">Guardar</button></div>
     </div></div>`;
@@ -2883,6 +2889,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         rawLink: document.getElementById('input-task-raw').value.trim(),
         editedLink: document.getElementById('input-task-edited').value.trim(),
         scriptLink: document.getElementById('input-task-script').value.trim(),
+        editReferenceLink: document.getElementById('input-task-edit-reference').value.trim(),
         notes: document.getElementById('input-task-notes').value.trim(),
       };
       if(payload.videosDone > payload.videoCount) payload.videosDone = payload.videoCount;
