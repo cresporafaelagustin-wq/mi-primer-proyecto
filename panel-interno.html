@@ -781,6 +781,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const referrerCut = revenue * Number(client.referrerCommissionPct||0) / 100;
     return revenue - clientEditingCostProjected(client.id) - referrerCut;
   }
+  function clientTotalVideosAssigned(clientId){
+    return state.tasks.filter(t=>t.clientId===clientId).reduce((s,t)=>s+Number(t.videoCount||0),0);
+  }
+  function clientVideosPending(clientId){
+    // Cuánto le queda por entregar al cliente en total, sumando todas sus tareas.
+    return state.tasks.filter(t=>t.clientId===clientId).reduce((s,t)=>s+Math.max(Number(t.videoCount||0)-Number(t.videosDone||0),0),0);
+  }
+  function clientPricePerVideoFromCharge(client){
+    // Precio por video calculado solo, sin tener que cargarlo tarea por tarea: lo que le cobrás
+    // en total dividido la cantidad de videos que le corresponden en total.
+    const totalVideos = clientTotalVideosAssigned(client.id);
+    return totalVideos > 0 ? Number(client.totalCharge||0) / totalVideos : 0;
+  }
+  function clientPendingDeliveryValue(client){
+    // Cuánto vale en plata lo que todavía le falta entregar a este cliente, según ese precio por video.
+    return clientVideosPending(client.id) * clientPricePerVideoFromCharge(client);
+  }
   function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function render(){
@@ -1728,6 +1745,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Estado</div><div class="stat-value" style="font-size:15px;">${client.status ? escapeHtml(client.status) : 'Sin estado'}</div></div>
         <div class="stat-card"><div class="stat-label">Tareas asociadas</div><div class="stat-value">${clientTasks.length}</div></div>
+        <div class="stat-card" data-tooltip="Suma de todos los videos que todavía faltan entregar en las tareas de este cliente."><div class="stat-label">Videos por entregar</div><div class="stat-value">${clientVideosPending(client.id)}</div></div>
       </div>
 
       <div class="section-head"><div><span class="section-tag">Enlaces</span><h2 class="section-title">Perfiles y archivos</h2></div></div>
@@ -1764,6 +1782,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         ${statCard('Venta por video (proyectada)', fmtMoney(clientVideoRevenueProjected(client.id)), 'Lo mismo pero contando todos los videos asignados a este cliente, no solo los ya entregados.')}
         ${statCard('Margen por video (generado)', fmtMoney(clientVideoMargin(client)), 'Venta por video ya entregado, menos lo que le pagás al editor por esos videos, menos la comisión del referido. Esto ya es tuyo.')}
         ${statCard('Margen por video (proyectado)', fmtMoney(clientVideoMarginProjected(client)), 'Lo mismo pero si se completan todos los videos asignados a este cliente.')}
+        ${statCard('Precio por video (según total a cobrar)', fmtMoney(clientPricePerVideoFromCharge(client)), 'Total a cobrar dividido la cantidad de videos asignados en total. Se calcula solo, sin tener que cargar el precio tarea por tarea.')}
+        ${statCard('Valor de lo pendiente de entregar', fmtMoney(clientPendingDeliveryValue(client)), 'Videos que todavía faltan entregar de este cliente, multiplicados por el precio por video de arriba.')}
       </div>
       ${ (clientVideoRevenue(client.id) === 0 && clientVideoRevenueProjected(client.id) === 0) ? `<p class="field-hint" style="margin-bottom:34px;">Cargá el "Precio por video (lo que le cobrás al cliente)" en cada tarea de este cliente para que este cálculo funcione.</p>` : '' }
 
