@@ -1748,7 +1748,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       </div>
 
       <div class="task-meta">
-        <span>Entrega <span class="mono">${fmtDate(t.deadline)}</span></span>
+        <span>Entrega <input type="date" class="mono" style="border:1px solid var(--paper-line); padding:3px 6px; font-size:12.5px;" value="${t.deadline||''}" data-deadline-id="${t.id}"></span>
         <span>Precio/video (editor) <span class="mono">${fmtMoney(t.pricePerVideo)}</span></span>
         ${ isAdmin && t.clientPricePerVideo ? `<span>Precio/video (cliente) <span class="mono">${fmtMoney(t.clientPricePerVideo)}</span></span>` : '' }
       </div>
@@ -2728,6 +2728,24 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       select.onchange = () => updateWorkflowStatus(select.getAttribute('data-workflow-id'), select.value);
     });
 
+    document.querySelectorAll('[data-deadline-id]').forEach(input=>{
+      const originalValue = input.value;
+      input.onchange = () => withBusy(async () => {
+        const t = state.tasks.find(x=>x.id===input.getAttribute('data-deadline-id'));
+        if(!t) return;
+        const value = input.value || null;
+        if(value === (originalValue || null)) return;
+        const { error } = await supabase.from('tasks').update({ deadline: value }).eq('id', t.id);
+        if(error) throw error;
+        pushUndo('Cambiar fecha de entrega', async () => {
+          const { error } = await supabase.from('tasks').update({ deadline: originalValue || null }).eq('id', t.id);
+          if(error) throw error;
+        });
+        await reloadData();
+        render();
+      });
+    });
+
     let draggedTaskId = null;
     document.querySelectorAll('.kanban-card[data-drag-task]').forEach(card=>{
       card.addEventListener('dragstart', (e)=>{
@@ -3093,11 +3111,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   let modalDirty = false;
   let lastAttachedModalRef = null;
+  // Modales que no tienen botón "Guardar" propio — todo lo que hay adentro se
+  // guarda solo al tipear/tocar, así que nunca hay "cambios sin guardar" que avisar.
+  const MODAL_KINDS_WITHOUT_DIRTY_CHECK = ['confirm', 'task-detail'];
 
   function closeModal(){ modalDirty = false; lastAttachedModalRef = null; state.modal = null; render(); }
 
   function closeModalIfConfirmed(){
-    if(modalDirty && state.modal && state.modal.kind !== 'confirm'){
+    if(modalDirty && state.modal && !MODAL_KINDS_WITHOUT_DIRTY_CHECK.includes(state.modal.kind)){
       if(!window.confirm('¿Salir sin guardar? Se va a perder lo que escribiste.')) return;
     }
     closeModal();
@@ -3106,7 +3127,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function attachModalEvents(){
     if(state.modal !== lastAttachedModalRef){ modalDirty = false; lastAttachedModalRef = state.modal; }
     const modalBox = document.querySelector('.modal');
-    if(modalBox && state.modal && state.modal.kind !== 'confirm'){
+    if(modalBox && state.modal && !MODAL_KINDS_WITHOUT_DIRTY_CHECK.includes(state.modal.kind)){
       modalBox.addEventListener('input', () => { modalDirty = true; });
       modalBox.addEventListener('change', () => { modalDirty = true; });
     }
