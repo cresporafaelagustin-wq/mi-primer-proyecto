@@ -1195,7 +1195,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(!client) return [];
     if(readOnly){
       return state.tasks.filter(t=>t.clientId===client.id).map(t=>({
-        project: t.project, workflowStatus: t.workflowStatus, videosDone: t.videosDone,
+        id: t.id, project: t.project, workflowStatus: t.workflowStatus, videosDone: t.videosDone,
         videoCount: t.videoCount, deadline: t.deadline, rawLink: t.rawLink, editedLink: t.editedLink
       }));
     }
@@ -1223,23 +1223,31 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     `;
   }
 
+  function renderClientJobKanbanCard(t){
+    const overdue = isOverdue(t);
+    const deadlineHtml = t.deadline
+      ? `<div class="kanban-card-deadline${overdue?' kanban-card-deadline-overdue':''}">${overdue?'▲ ':''}${fmtDate(t.deadline)}</div>`
+      : '';
+    return `<button type="button" class="kanban-card" data-open-client-job="${t.id}">${escapeHtml(t.project)}${deadlineHtml}</button>`;
+  }
+
   function renderClientJobsTab(client, readOnly){
     const jobs = clientJobsFor(client, readOnly);
-    const jobRows = jobs.map(t => `
-      <div class="task-card" style="margin-bottom:12px;">
-        <div class="task-top">
-          <div><strong>${escapeHtml(t.project)}</strong></div>
-          <span class="status-tag">${escapeHtml(t.workflowStatus)}</span>
-        </div>
-        <div class="task-meta">
-          <span>${t.videosDone}/${t.videoCount} video${t.videoCount===1?'':'s'} completados</span>
-          ${ t.deadline ? `<span>Entrega: ${fmtDate(t.deadline)}</span>` : '' }
-        </div>
-        ${ t.rawLink || t.editedLink ? `<div class="task-links" style="margin-top:6px;">
-          ${ t.rawLink ? contentLinkRow('Crudo', t.rawLink) : '' }
-          ${ t.editedLink ? contentLinkRow('Editado', t.editedLink) : '' }
-        </div>` : '' }
-      </div>`).join('');
+
+    const columnsHtml = TASK_WORKFLOW_STATUSES.map(status=>{
+      const colJobs = jobs.filter(t=>(t.workflowStatus||'Sin editar')===status);
+      const cards = colJobs.map(t=>renderClientJobKanbanCard(t)).join('');
+      return `
+        <div class="kanban-column">
+          <div class="kanban-col-head">
+            <span class="kanban-col-title">${escapeHtml(status)}</span>
+            <span class="kanban-col-count">${colJobs.length}</span>
+          </div>
+          <div class="kanban-column-drop">
+          ${ colJobs.length === 0 ? `<div class="kanban-empty">Sin trabajos acá</div>` : cards }
+          </div>
+        </div>`;
+    }).join('');
 
     const formHtml = readOnly ? '' : `
       <div class="section-head" style="margin-top:34px;"><div><span class="section-tag">Nuevo</span><h2 class="section-title">Pedir videos nuevos</h2></div></div>
@@ -1254,9 +1262,44 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     return `
       <div class="section-head"><div><span class="section-tag">Portal de cliente</span><h2 class="section-title">Mis trabajos</h2></div></div>
-      ${ jobs.length ? jobRows : emptyState('Todavía no tenés trabajos asignados', 'Cuando tengas un video en marcha, va a aparecer acá.') }
+      ${ jobs.length === 0 ? emptyState('Todavía no tenés trabajos asignados', 'Cuando tengas un video en marcha, va a aparecer acá.') : `<div class="kanban-board">${columnsHtml}</div>` }
       ${formHtml}
     `;
+  }
+
+  function renderClientJobDetailModal(id, readOnly){
+    const client = readOnly ? state.clients.find(c=>c.id===state.viewAsClientId) : state.clients.find(c=>c.id===state.currentUser.id);
+    const jobs = clientJobsFor(client, readOnly);
+    const t = jobs.find(x=>x.id===id);
+    if(!t){
+      return `
+      <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+        <h3>Trabajo no encontrado</h3>
+        <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cerrar</button></div>
+      </div></div>`;
+    }
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal" style="max-width:480px;">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+          <button class="btn btn-ghost btn-sm" id="btn-cancel-modal">Cerrar</button>
+        </div>
+        <div class="task-card" style="border:none; padding:0;">
+          <div class="task-top">
+            <div><div class="task-project">${escapeHtml(t.project)}</div></div>
+            <span class="status-tag">${escapeHtml(t.workflowStatus)}</span>
+          </div>
+          <div class="task-meta">
+            <span>${t.videosDone}/${t.videoCount} video${t.videoCount===1?'':'s'} completados</span>
+            ${ t.deadline ? `<span>Entrega: ${fmtDate(t.deadline)}</span>` : '' }
+          </div>
+          ${ t.rawLink || t.editedLink ? `<div class="task-links">
+            ${ t.rawLink ? contentLinkRow('Crudo', t.rawLink) : '' }
+            ${ t.editedLink ? contentLinkRow('Editado', t.editedLink) : '' }
+          </div>` : '' }
+        </div>
+      </div>
+    </div>`;
   }
 
   function renderClientContentTab(client){
@@ -2581,6 +2624,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         render();
       };
     });
+    document.querySelectorAll('[data-open-client-job]').forEach(btn=>{
+      btn.onclick = () => {
+        state.modal = { kind:'client-job-detail', id: btn.getAttribute('data-open-client-job'), readOnly: state.currentUser.type === 'admin' };
+        render();
+      };
+    });
     const backToClientsBtn = document.getElementById('btn-back-to-clients');
     if(backToClientsBtn) backToClientsBtn.onclick = () => { state.clientDetailId = null; render(); };
     const backToEditorsBtn = document.getElementById('btn-back-to-editors');
@@ -2840,6 +2889,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(m.kind === 'task') return renderTaskModal(m.data, m.restrictEditorId, m.seed);
     if(m.kind === 'bulk-task') return renderBulkTaskModal();
     if(m.kind === 'task-detail') return renderTaskDetailModal(m.id, m.isAdmin);
+    if(m.kind === 'client-job-detail') return renderClientJobDetailModal(m.id, m.readOnly);
     if(m.kind === 'confirm') return renderConfirmModal(m.message);
     if(m.kind === 'import-clients') return renderImportClientsModal();
     if(m.kind === 'import-backup') return renderImportBackupModal();
