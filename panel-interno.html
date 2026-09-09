@@ -235,6 +235,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 }
 .kanban-card:hover{ border-color:var(--ink); background:var(--paper-line); }
 .kanban-card.dragging{ opacity:0.35; cursor:grabbing; }
+.kanban-card-deadline{
+  font-family:'IBM Plex Mono',monospace; font-weight:400; font-size:11px; letter-spacing:0.03em;
+  text-transform:uppercase; color:var(--ink-soft); margin-top:8px;
+}
+.kanban-card-deadline-overdue{ color:var(--ink); font-weight:700; }
 
 /* ============ MODAL DE DETALLE DE TAREA ============ */
 .task-detail-inner .task-card{ border:none; padding:0; gap:16px; }
@@ -1693,7 +1698,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   function renderTaskKanbanCard(t, isAdmin){
-    return `<button type="button" class="kanban-card" draggable="true" data-drag-task="${t.id}" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}</button>`;
+    const overdue = isOverdue(t);
+    const deadlineHtml = t.deadline
+      ? `<div class="kanban-card-deadline${overdue?' kanban-card-deadline-overdue':''}">${overdue?'▲ ':''}${fmtDate(t.deadline)}</div>`
+      : '';
+    return `<button type="button" class="kanban-card" draggable="true" data-drag-task="${t.id}" data-open-task="${t.id}" data-open-task-admin="${isAdmin?1:0}">${escapeHtml(t.project)}${deadlineHtml}</button>`;
   }
 
   function renderTaskDetailModal(id, isAdmin){
