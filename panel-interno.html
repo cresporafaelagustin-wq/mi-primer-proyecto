@@ -405,7 +405,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     notifySettings: { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE },
     currentUser: null,
     login: { step: 'request', email: '', code: '', error: '', loading: false },
-    activeTab: 'resumen',
+    activeTab: localStorage.getItem('sca_active_tab') || 'resumen',
     filter: { editorId:'', clientId:'', status:'', priority:'', workflowStatus:'', clientStatus:'', month:'' },
     clientDetailId: null,
     editorDetailId: null,
@@ -1062,6 +1062,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['archivo','Archivo'],['pedidos',pedidosLabel],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
     const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mi-archivo','Archivo'],['mis-proyecciones','Mis proyecciones']];
     const tabs = (isAdmin && !previewing) ? adminTabs : editorTabs;
+    if(!previewing && !tabs.some(([key])=>key===state.activeTab)) setActiveTab(tabs[0][0]);
     const tabsHtml = tabs.map(([key,label]) => `<button class="tab-btn ${state.activeTab===key?'active':''}" data-tab="${key}">${navIcon(key)}<span class="sidebar-hide-label">${label}</span></button>`).join('');
 
     return `
@@ -1116,13 +1117,18 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     };
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       btn.onclick = () => {
-        state.activeTab = btn.getAttribute('data-tab');
+        setActiveTab(btn.getAttribute('data-tab'));
         state.clientDetailId = null;
         state.editorDetailId = null;
         render();
       };
     });
     attachContentEvents();
+  }
+
+  function setActiveTab(tab){
+    state.activeTab = tab;
+    localStorage.setItem('sca_active_tab', tab);
   }
 
   function renderPedidos(){
@@ -2334,7 +2340,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(fm) fm.onchange = () => { state.filter.month = fm.value; render(); };
     document.querySelectorAll('[data-goto-tab]').forEach(btn=>{
       btn.onclick = () => {
-        state.activeTab = btn.getAttribute('data-goto-tab');
+        setActiveTab(btn.getAttribute('data-goto-tab'));
         state.clientDetailId = null;
         state.editorDetailId = null;
         render();
