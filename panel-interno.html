@@ -113,11 +113,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
 .sidebar{
   width:80px; flex-shrink:0; background:var(--ink); color:var(--cream);
-  display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow:hidden;
+  display:flex; flex-direction:column; position:fixed; left:0; top:0; height:100vh; overflow:hidden;
   border-right:1px solid var(--divider-dark);
   transition: width .22s ease;
+  z-index:20;
 }
-.sidebar:hover, .sidebar:focus-within{ width:264px; overflow-y:auto; }
+.sidebar:hover, .sidebar:focus-within{ width:264px; overflow-y:auto; box-shadow:6px 0 24px rgba(0,0,0,0.28); }
 .sidebar-top{ padding:30px 24px 24px; }
 .wordmark{ font-family:'Playfair Display', serif; font-weight:900; font-size:19px; letter-spacing:0.02em; margin-bottom:7px; }
 .topbar-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,244,239,0.55); }
@@ -155,7 +156,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .user-dot{ width:6px; height:6px; background:var(--cream); flex-shrink:0; }
 .user-dot.admin{ background:var(--cream); }
 
-.main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; }
+.main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; margin-left:80px; }
 .section-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
 
 @media (max-width:860px){
@@ -171,7 +172,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   .sidebar-bottom{ flex-direction:row; border-top:none; border-left:1px solid var(--divider-dark); padding:10px 14px; flex-shrink:0; }
   .sidebar-bottom .user-badge{ width:auto; }
   .sidebar-bottom .btn{ width:auto; white-space:nowrap; }
-  .main{ padding:28px 20px 64px; }
+  .main{ padding:28px 20px 64px; margin-left:0; }
 }
 
 /* ============ STAT PLATES (dark cards on light page) ============ */
