@@ -109,7 +109,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .on-dark .btn-ghost:hover{ background:var(--cream); color:var(--ink); }
 
 /* ============ APP SHELL / SIDEBAR (dark / masthead) ============ */
-.app-shell{ display:flex; align-items:stretch; min-height:100vh; }
+.app-shell{ display:flex; align-items:stretch; min-height:100vh; padding-left:80px; }
 
 .sidebar{
   width:80px; flex-shrink:0; background:var(--ink); color:var(--cream);
@@ -156,11 +156,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .user-dot{ width:6px; height:6px; background:var(--cream); flex-shrink:0; }
 .user-dot.admin{ background:var(--cream); }
 
-.main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; margin-left:80px; }
+.main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; }
 .section-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
 
 @media (max-width:860px){
-  .app-shell{ flex-direction:column; }
+  .app-shell{ flex-direction:column; padding-left:0; }
   .sidebar{ width:100% !important; height:auto; position:static; flex-direction:row; align-items:center; overflow-x:auto; border-right:none; border-bottom:1px solid var(--divider-dark); }
   .sidebar-hide-label{ opacity:1 !important; max-width:220px !important; }
   .sidebar-top{ padding:14px 18px; flex-shrink:0; }
@@ -172,7 +172,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   .sidebar-bottom{ flex-direction:row; border-top:none; border-left:1px solid var(--divider-dark); padding:10px 14px; flex-shrink:0; }
   .sidebar-bottom .user-badge{ width:auto; }
   .sidebar-bottom .btn{ width:auto; white-space:nowrap; }
-  .main{ padding:28px 20px 64px; margin-left:0; }
+  .main{ padding:28px 20px 64px; }
 }
 
 /* ============ STAT PLATES (dark cards on light page) ============ */
