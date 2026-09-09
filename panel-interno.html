@@ -2556,7 +2556,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-duplicate-task'));
         if(!t) return;
         const restrictEditorId = isPreviewMode() ? state.viewAsEditorId : (state.currentUser.type === 'editor' ? state.currentUser.id : null);
-        const seed = { ...t, videosDone: 0, paid: false, rawLink: '', editedLink: '', scriptLink: '', workflowStatus: 'Sin editar' };
+        const seed = { ...t };
         state.modal = { kind:'task', data: null, restrictEditorId, seed };
         render();
       };
