@@ -1622,7 +1622,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </select>
       </div>` : '';
 
-    const addBtn = `<button class="btn btn-primary btn-sm" id="btn-new-task">+ Nueva tarea</button>`;
+    const addBtn = `
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" id="btn-new-task">+ Nueva tarea</button>
+        ${ isAdmin ? `<button class="btn btn-ghost btn-sm" id="btn-new-task-bulk">+ Varias tareas</button>` : '' }
+      </div>`;
 
     const columnsHtml = TASK_WORKFLOW_STATUSES.map(status=>{
       const colTasks = tasks.filter(t=>(t.workflowStatus||'Sin editar')===status);
@@ -2406,6 +2410,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       state.modal = { kind:'task', data:null, restrictEditorId };
       render();
     };
+    const newTaskBulk = document.getElementById('btn-new-task-bulk');
+    if(newTaskBulk) newTaskBulk.onclick = () => { state.modal = { kind:'bulk-task' }; render(); };
     const newEditor = document.getElementById('btn-new-editor');
     if(newEditor) newEditor.onclick = () => { state.modal = { kind:'editor', data:null }; render(); };
     const newClient = document.getElementById('btn-new-client');
@@ -2804,6 +2810,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(m.kind === 'editor') return renderEditorModal(m.data);
     if(m.kind === 'client') return renderClientModal(m.data);
     if(m.kind === 'task') return renderTaskModal(m.data, m.restrictEditorId, m.seed);
+    if(m.kind === 'bulk-task') return renderBulkTaskModal();
     if(m.kind === 'task-detail') return renderTaskDetailModal(m.id, m.isAdmin);
     if(m.kind === 'confirm') return renderConfirmModal(m.message);
     if(m.kind === 'import-clients') return renderImportClientsModal();
@@ -3035,6 +3042,41 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client">Guardar</button></div>
     </div></div>`;
   }
+  function renderBulkTaskModal(){
+    const clientOptions = state.clients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    const editorOptions = state.editors.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
+    return `
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <h3>Varias tareas de una</h3>
+      <p class="field-hint" style="margin:0 0 15px;">Escribí un nombre de proyecto por línea. Se va a crear una tarea por cada línea, todas con estos mismos datos.</p>
+      <div class="field"><label class="field-label">Nombres de los proyectos (uno por línea)</label><textarea id="input-bulk-projects" rows="6" placeholder="Crudos AD 1 Agosto&#10;Crudos AD 2 Agosto&#10;Crudos AD 3 Agosto"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Cliente</label><select id="input-bulk-client"><option value="">Sin cliente</option>${clientOptions}</select></div>
+        <div class="field"><label class="field-label">Editor asignado</label><select id="input-bulk-editor"><option value="">Sin asignar</option>${editorOptions}</select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Cantidad de videos (por tarea)</label><input type="number" min="0" id="input-bulk-count" value="1"></div>
+        <div class="field"><label class="field-label">Prioridad</label>
+          <select id="input-bulk-priority">
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Fecha de entrega</label><input type="date" id="input-bulk-deadline"></div>
+        <div class="field"><label class="field-label">Precio por video (a favor del editor)</label><input type="number" min="0" step="0.01" id="input-bulk-price" value="0"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Precio por video (lo que le cobrás al cliente)</label>
+        <input type="number" min="0" step="0.01" id="input-bulk-client-price" value="0">
+        <p class="field-hint">Opcional. Esto no lo ven los editores.</p>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-bulk-tasks">Crear tareas</button></div>
+    </div></div>`;
+  }
+
   function renderTaskModal(data, restrictEditorId, seed){
     const src = data || seed || null;
     const canSeeClientPrice = state.currentUser.type === 'admin' && !isPreviewMode();
@@ -3444,6 +3486,42 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       await reloadData();
       render();
       alert(`Importación completa: ${oldEditors.length} editores, ${oldClients.length} clientes y ${importedTasks} tareas procesadas.`);
+    });
+
+    const saveBulkTasksBtn = document.getElementById('btn-save-bulk-tasks');
+    if(saveBulkTasksBtn) saveBulkTasksBtn.onclick = () => withBusy(async () => {
+      const names = document.getElementById('input-bulk-projects').value
+        .split('\n').map(s=>s.trim()).filter(Boolean);
+      if(!names.length) return;
+      const shared = {
+        clientId: document.getElementById('input-bulk-client').value,
+        editorId: document.getElementById('input-bulk-editor').value,
+        videoCount: Number(document.getElementById('input-bulk-count').value) || 0,
+        priority: document.getElementById('input-bulk-priority').value || 'media',
+        workflowStatus: 'Sin editar',
+        deadline: document.getElementById('input-bulk-deadline').value,
+        pricePerVideo: Number(document.getElementById('input-bulk-price').value) || 0,
+        videosDone: 0, paid: false, rawLink: '', editedLink: '', scriptLink: '', editReferenceLink: '', notes: ''
+      };
+      const clientPrice = Number(document.getElementById('input-bulk-client-price').value) || 0;
+      const rows = names.map(project => taskToRow({ ...shared, project }));
+      const { data: inserted, error } = await supabase.from('tasks').insert(rows).select();
+      if(error) throw error;
+      if(inserted && inserted.length && clientPrice){
+        const priceRows = inserted.map(row => ({ task_id: row.id, client_price_per_video: clientPrice }));
+        const { error: priceError } = await supabase.from('task_client_price').insert(priceRows);
+        if(priceError) throw priceError;
+      }
+      if(inserted && inserted.length){
+        const ids = inserted.map(row => row.id);
+        pushUndo(`Crear ${ids.length} tareas`, async () => {
+          const { error } = await supabase.from('tasks').delete().in('id', ids);
+          if(error) throw error;
+        });
+      }
+      closeModal();
+      await reloadData();
+      render();
     });
 
     const saveTaskBtn = document.getElementById('btn-save-task');
