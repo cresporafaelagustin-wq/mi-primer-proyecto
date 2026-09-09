@@ -641,6 +641,20 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   }
 
   async function handleSession(session){
+    // Supabase renueva el token de sesión solo en segundo plano (por ejemplo
+    // al volver a esta pestaña del navegador después de un rato), y eso
+    // dispara este mismo callback. Si ya estábamos logueados como el mismo
+    // usuario, no hay nada que resolver de nuevo — solo actualizamos el
+    // token. Si en cambio recargáramos datos y volviéramos a pintar toda la
+    // pantalla acá, se perdía cualquier cosa que la persona tuviera escrita
+    // a medias en un formulario abierto, sin que hiciera nada para borrarla.
+    const sameUser = state.currentUser && state.currentUser.type !== 'unlinked'
+      && session && session.user && state.session && state.session.user
+      && session.user.id === state.session.user.id;
+    if(sameUser){
+      state.session = session;
+      return;
+    }
     state.session = session || null;
     if(!session){
       state.currentUser = null;
