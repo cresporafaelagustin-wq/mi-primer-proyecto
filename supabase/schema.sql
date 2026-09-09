@@ -132,21 +132,6 @@ create table if not exists public.task_client_price (
   updated_at              timestamptz not null default now()
 );
 
--- Pedidos que carga un cliente desde su propio portal (login por email, sin
--- contraseña). No es una tarea todavía: el admin lo revisa en la pestaña
--- "Pedidos" y recién ahí lo convierte en una tarea real, asignándole editor
--- y precio. Así un cliente nunca ve ni toca la tabla de tareas.
-create table if not exists public.task_requests (
-  id           uuid primary key default gen_random_uuid(),
-  client_id    uuid not null references public.clients(id) on delete cascade,
-  project      text not null,
-  video_count  integer not null default 0,
-  deadline     date,
-  notes        text not null default '',
-  status       text not null default 'Pendiente' check (status in ('Pendiente','Convertida','Descartada')),
-  created_at   timestamptz not null default now()
-);
-
 -- Un admin puede tener su propia config de alertas (email/telefono/plantilla).
 create table if not exists public.notify_settings (
   owner_id   uuid primary key references auth.users(id) on delete cascade,
@@ -274,7 +259,6 @@ alter table public.client_finance enable row level security;
 alter table public.finance_settings enable row level security;
 alter table public.tasks enable row level security;
 alter table public.task_client_price enable row level security;
-alter table public.task_requests enable row level security;
 alter table public.notify_settings enable row level security;
 alter table public.admin_emails enable row level security;
 alter table public.profiles enable row level security;
@@ -340,19 +324,21 @@ drop policy if exists "editor delete own tasks" on public.tasks;
 create policy "editor delete own tasks" on public.tasks
   for delete using (editor_id = public.current_editor_id());
 
--- task_requests: admin puede todo (revisarlos y convertirlos en tareas);
--- un cliente solo puede crear y leer los pedidos que él mismo cargó.
-drop policy if exists "admin full access task_requests" on public.task_requests;
-create policy "admin full access task_requests" on public.task_requests
-  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
-
-drop policy if exists "client insert own task_requests" on public.task_requests;
-create policy "client insert own task_requests" on public.task_requests
-  for insert with check (client_id = public.current_client_id());
-
-drop policy if exists "client read own task_requests" on public.task_requests;
-create policy "client read own task_requests" on public.task_requests
-  for select using (client_id = public.current_client_id());
+-- Un cliente puede crear una tarea propia directo (sin pasar por una
+-- aprobación), pero solo en blanco: para sí mismo, sin editor asignado, sin
+-- precio, sin marcar videos hechos ni pagada, en estado "Sin editar". No
+-- tiene ningún otro permiso sobre "tasks" — ni leerla directo, ni editarla,
+-- ni borrarla.
+drop policy if exists "client insert own task" on public.tasks;
+create policy "client insert own task" on public.tasks
+  for insert with check (
+    client_id = public.current_client_id()
+    and editor_id is null
+    and price_per_video = 0
+    and videos_done = 0
+    and paid = false
+    and workflow_status = 'Sin editar'
+  );
 
 -- Un cliente ve el estado de sus tareas (para eso está el portal), pero
 -- "tasks" tiene columnas que no debe ver bajo ningún concepto (precio al

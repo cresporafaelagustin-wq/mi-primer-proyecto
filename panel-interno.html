@@ -405,7 +405,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     referrers: [],
     paymentAccounts: [],
     fixedExpenses: [],
-    taskRequests: [],
     clientTasks: [],
     financeSettings: { ownerSharePct: 70 },
     notifySettings: { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE },
@@ -474,13 +473,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function fixedExpenseFromRow(r){
     return { id: r.id, name: r.name, cost: Number(r.cost)||0, payoutAccountId: r.payout_account_id || '' };
   }
-  function taskRequestFromRow(r){
-    return {
-      id: r.id, clientId: r.client_id, project: r.project,
-      videoCount: Number(r.video_count)||0, deadline: r.deadline || '',
-      notes: r.notes || '', status: r.status || 'Pendiente', createdAt: r.created_at
-    };
-  }
   function clientVisibleTaskFromRow(r){
     return {
       id: r.id, clientId: r.client_id, project: r.project,
@@ -536,15 +528,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   async function reloadData(){
     if(state.currentUser && state.currentUser.type === 'client'){
-      const [ownClientRes, contractRes, requestsRes, tasksRes] = await Promise.all([
+      const [ownClientRes, contractRes, tasksRes] = await Promise.all([
         supabase.from('clients').select('*').eq('id', state.currentUser.id).maybeSingle(),
         supabase.from('client_contracts').select('*').eq('client_id', state.currentUser.id).maybeSingle(),
-        supabase.from('task_requests').select('*').eq('client_id', state.currentUser.id).order('created_at', { ascending: false }),
         supabase.from('client_visible_tasks').select('*').order('created_at', { ascending: false })
       ]);
       state.clients = ownClientRes.data ? [clientFromRow(ownClientRes.data)] : [];
       if(state.clients[0]) state.clients[0].contractLink = (contractRes.data && contractRes.data.contract_link) || '';
-      state.taskRequests = (requestsRes.data || []).map(taskRequestFromRow);
       state.clientTasks = (tasksRes.data || []).map(clientVisibleTaskFromRow);
       return;
     }
@@ -559,7 +549,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     state.tasks = (tasksRes.data || []).map(taskFromRow);
 
     if(state.currentUser && state.currentUser.type === 'admin' && state.session){
-      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes, taskPricesRes, requestsRes] = await Promise.all([
+      const [ns, contracts, accountsRes, referrersRes, expensesRes, financeRes, fsRes, taskPricesRes] = await Promise.all([
         supabase.from('notify_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
         supabase.from('client_contracts').select('*'),
         supabase.from('payment_accounts').select('*').order('name'),
@@ -567,10 +557,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         supabase.from('fixed_expenses').select('*').order('name'),
         supabase.from('client_finance').select('*'),
         supabase.from('finance_settings').select('*').eq('owner_id', state.session.user.id).maybeSingle(),
-        supabase.from('task_client_price').select('*'),
-        supabase.from('task_requests').select('*').order('created_at', { ascending: false })
+        supabase.from('task_client_price').select('*')
       ]);
-      state.taskRequests = (requestsRes.data || []).map(taskRequestFromRow);
       state.notifySettings = ns.data
         ? { email: ns.data.email || '', phone: ns.data.phone || '', template: ns.data.template || DEFAULT_ALERT_TEMPLATE }
         : { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE };
@@ -989,22 +977,19 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(btn) btn.onclick = () => withBusy(doLogout);
   }
 
-  const REQUEST_STATUS_LABEL = { 'Pendiente': 'Pendiente de revisión', 'Convertida': 'Aceptado, ya es una tarea', 'Descartada': 'No se va a hacer' };
-
   function renderClientPortal(){
     const client = state.clients.find(c=>c.id===state.currentUser.id);
-    return renderClientPortalContent(client, state.clientTasks || [], state.taskRequests || [], false);
+    return renderClientPortalContent(client, state.clientTasks || [], false);
   }
 
   function renderClientPreview(client){
     const jobs = state.tasks
       .filter(t=>t.clientId===client.id)
       .map(t=>({ project: t.project, workflowStatus: t.workflowStatus, videosDone: t.videosDone, videoCount: t.videoCount, deadline: t.deadline, rawLink: t.rawLink, editedLink: t.editedLink }));
-    const requests = (state.taskRequests||[]).filter(r=>r.clientId===client.id);
-    return renderClientPortalContent(client, jobs, requests, true);
+    return renderClientPortalContent(client, jobs, true);
   }
 
-  function renderClientPortalContent(client, jobs, requests, readOnly){
+  function renderClientPortalContent(client, jobs, readOnly){
     const clientName = client ? client.name : '';
 
     const clientLinkRow = (label, url) => `
@@ -1029,29 +1014,16 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </div>` : '' }
       </div>`).join('');
 
-    const requestRows = requests.map(r => `
-      <div class="task-card" style="margin-bottom:12px;">
-        <div class="task-top">
-          <div><strong>${escapeHtml(r.project)}</strong></div>
-          <span class="status-tag">${escapeHtml(REQUEST_STATUS_LABEL[r.status] || r.status)}</span>
-        </div>
-        <div class="task-meta">
-          <span>${r.videoCount} video${r.videoCount===1?'':'s'}</span>
-          ${ r.deadline ? `<span>Entrega deseada: ${fmtDate(r.deadline)}</span>` : '' }
-        </div>
-        ${ r.notes ? `<p class="empty-note" style="margin:8px 0 0;">${escapeHtml(r.notes)}</p>` : '' }
-      </div>`).join('');
-
-    const requestFormHtml = readOnly ? '' : `
+    const newTaskFormHtml = readOnly ? '' : `
         <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Pedir videos nuevos</h2>
-        <div class="field"><label class="field-label">¿Qué necesitás? (proyecto/nombre del pedido)</label><input type="text" id="input-request-project" placeholder="Ej: Videos de la campaña de agosto"></div>
+        <div class="field"><label class="field-label">¿Qué necesitás? (nombre del proyecto)</label><input type="text" id="input-request-project" placeholder="Ej: Videos de la campaña de agosto"></div>
         <div class="field-row">
           <div class="field"><label class="field-label">Cantidad de videos</label><input type="number" min="1" step="1" id="input-request-video-count" placeholder="1"></div>
           <div class="field"><label class="field-label">Fecha límite deseada (opcional)</label><input type="date" id="input-request-deadline"></div>
         </div>
         <div class="field"><label class="field-label">Notas / detalles</label><textarea id="input-request-notes" rows="3" placeholder="Contexto, referencias, lo que haga falta..."></textarea></div>
         <p class="login-error" id="request-error" style="display:none;"></p>
-        <div class="role-list"><button class="role-btn admin-btn" id="btn-send-request">Enviar pedido</button></div>`;
+        <div class="role-list"><button class="role-btn admin-btn" id="btn-send-request">Agregar a mis trabajos</button></div>`;
 
     const bottomHtml = readOnly
       ? `<div class="role-list" style="margin-top:24px;"><button class="btn btn-ghost btn-sm" id="btn-exit-client-preview">Salir de la vista previa</button></div>`
@@ -1060,7 +1032,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return `
     <div class="login-screen">
       <div class="login-card" style="max-width:560px;">
-        ${ readOnly ? `<div style="border:2px solid var(--ink); padding:12px 16px; margin-bottom:22px; font-size:12.5px; line-height:1.5;">👁 Estás viendo el portal como lo ve <strong>${escapeHtml(clientName)}</strong>. Es de solo lectura — no se puede enviar un pedido desde acá.</div>` : '' }
+        ${ readOnly ? `<div style="border:2px solid var(--ink); padding:12px 16px; margin-bottom:22px; font-size:12.5px; line-height:1.5;">👁 Estás viendo el portal como lo ve <strong>${escapeHtml(clientName)}</strong>. Es de solo lectura — no se puede agregar un trabajo desde acá.</div>` : '' }
         <div class="login-wordmark">SCA</div>
         <span class="section-tag">Portal de cliente</span>
         <h1 class="login-title">Hola, ${escapeHtml(clientName)}</h1>
@@ -1081,11 +1053,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           </div>
         </div>
 
-        ${requestFormHtml}
-
-        ${ requests.length ? `
-        <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Tus pedidos</h2>
-        ${requestRows}` : '' }
+        ${newTaskFormHtml}
 
         ${bottomHtml}
       </div>
@@ -1110,8 +1078,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         errorEl.style.display = 'block';
         return;
       }
-      const { error } = await supabase.from('task_requests').insert({
-        client_id: state.currentUser.id, project, video_count: videoCount, deadline, notes
+      const { error } = await supabase.from('tasks').insert({
+        client_id: state.currentUser.id, project, video_count: videoCount, deadline, notes,
+        editor_id: null, price_per_video: 0, videos_done: 0, paid: false, workflow_status: 'Sin editar'
       });
       if(error) throw error;
       await reloadData();
@@ -1126,7 +1095,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     alertas: '<path d="M12 3 L22 20 L2 20 Z"></path><line x1="12" y1="9.5" x2="12" y2="14"></line><circle cx="12" cy="16.8" r="0.9" fill="currentColor" stroke="none"></circle>',
     editores: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"></path>',
     clientes: '<rect x="3" y="8" width="18" height="12"></rect><path d="M8 8V6a4 4 0 0 1 8 0v2"></path>',
-    pedidos: '<path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"></path><path d="M12 22 L12 12 M3 7 L12 12 L21 7"></path>',
     finanzas: '<polyline points="3,17 9,11 13,15 21,5"></polyline><polyline points="15,5 21,5 21,11"></polyline>',
     'mis-proyecciones': '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle>',
     archivo: '<rect x="3" y="4" width="18" height="5"></rect><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"></path><line x1="10" y1="13" x2="14" y2="13"></line>',
@@ -1142,9 +1110,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const isAdmin = state.currentUser.type === 'admin';
     const previewing = isAdmin && isPreviewMode();
     const userLabel = isAdmin ? (previewing ? `Viendo como ${editorName(state.viewAsEditorId)}` : 'Administrador') : editorName(state.currentUser.id);
-    const pendingRequestCount = (state.taskRequests||[]).filter(r=>r.status==='Pendiente').length;
-    const pedidosLabel = 'Pedidos' + (pendingRequestCount ? ` (${pendingRequestCount})` : '');
-    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['archivo','Archivo'],['pedidos',pedidosLabel],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
+    const adminTabs = [['resumen','Resumen'],['tareas','Tareas'],['archivo','Archivo'],['alertas','Alertas'],['editores','Editores'],['clientes','Clientes'],['finanzas','Finanzas']];
     const editorTabs = [['resumen','Resumen'],['mis-tareas','Mis tareas'],['mi-archivo','Archivo'],['mis-proyecciones','Mis proyecciones']];
     const tabs = (isAdmin && !previewing) ? adminTabs : editorTabs;
     if(!previewing && !tabs.some(([key])=>key===state.activeTab)) setActiveTab(tabs[0][0]);
@@ -1214,39 +1180,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function setActiveTab(tab){
     state.activeTab = tab;
     localStorage.setItem('sca_active_tab', tab);
-  }
-
-  function renderPedidos(){
-    const requests = [...(state.taskRequests||[])].sort((a,b)=>{
-      if(a.status==='Pendiente' && b.status!=='Pendiente') return -1;
-      if(b.status==='Pendiente' && a.status!=='Pendiente') return 1;
-      return (b.createdAt||'').localeCompare(a.createdAt||'');
-    });
-    if(!requests.length) return emptyState('Todavía no hay pedidos', 'Cuando un cliente con acceso al portal cargue un pedido, va a aparecer acá para que lo conviertas en tarea.');
-    const cards = requests.map(r => `
-      <div class="task-card">
-        <div class="task-top">
-          <div>
-            <div class="task-project">${escapeHtml(r.project)}</div>
-            <div class="task-client">${escapeHtml(clientName(r.clientId))}</div>
-          </div>
-          <span class="status-tag">${escapeHtml(REQUEST_STATUS_LABEL[r.status] || r.status)}</span>
-        </div>
-        <div class="task-meta">
-          <span>${r.videoCount} video${r.videoCount===1?'':'s'}</span>
-          ${ r.deadline ? `<span>Entrega deseada: ${fmtDate(r.deadline)}</span>` : '' }
-          <span>Pedido el ${fmtDate((r.createdAt||'').slice(0,10))}</span>
-        </div>
-        ${ r.notes ? `<p style="margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5;">${escapeHtml(r.notes)}</p>` : '' }
-        ${ r.status === 'Pendiente' ? `
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" data-convert-request="${r.id}">Convertir en tarea</button>
-          <button class="btn btn-ghost btn-sm" data-discard-request="${r.id}">Descartar</button>
-        </div>` : '' }
-      </div>`).join('');
-    return `
-      <div class="section-head"><div><span class="section-tag">Portal de cliente</span><h2 class="section-title">Pedidos</h2></div></div>
-      <div class="task-grid">${cards}</div>`;
   }
 
   function buildAlertMessage(t){
@@ -1331,7 +1264,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(state.activeTab === 'resumen') return renderResumen();
     if(state.activeTab === 'tareas') return renderTareas(true);
     if(state.activeTab === 'archivo') return renderArchivo(true);
-    if(state.activeTab === 'pedidos') return renderPedidos();
     if(state.activeTab === 'alertas') return renderAlertas();
     if(state.activeTab === 'editores') return renderEditoresManage();
     if(state.activeTab === 'clientes') return renderClientesManage();
@@ -2655,24 +2587,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         render();
       };
     });
-    document.querySelectorAll('[data-convert-request]').forEach(btn=>{
-      btn.onclick = () => {
-        const r = (state.taskRequests||[]).find(x=>x.id===btn.getAttribute('data-convert-request'));
-        if(!r) return;
-        const seed = { project: r.project, clientId: r.clientId, videoCount: r.videoCount, deadline: r.deadline, notes: r.notes, pricePerVideo: 0, videosDone: 0 };
-        state.modal = { kind:'task', data: null, restrictEditorId: null, seed, convertRequestId: r.id };
-        render();
-      };
-    });
-    document.querySelectorAll('[data-discard-request]').forEach(btn=>{
-      btn.onclick = () => askConfirm('¿Descartar este pedido? El cliente va a ver que no se va a hacer.', () => withBusy(async () => {
-        const id = btn.getAttribute('data-discard-request');
-        const { error } = await supabase.from('task_requests').update({ status: 'Descartada' }).eq('id', id);
-        if(error) throw error;
-        await reloadData();
-        render();
-      }));
-    });
     document.querySelectorAll('[data-toggle-paid]').forEach(btn=>{
       btn.onclick = () => withBusy(async () => {
         const t = state.tasks.find(x=>x.id===btn.getAttribute('data-toggle-paid'));
@@ -3680,10 +3594,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           const { error } = await supabase.from('tasks').delete().eq('id', inserted.id);
           if(error) throw error;
         });
-        if(inserted && state.modal.convertRequestId){
-          const { error: reqError } = await supabase.from('task_requests').update({ status: 'Convertida' }).eq('id', state.modal.convertRequestId);
-          if(reqError) throw reqError;
-        }
       }
       closeModal();
       await reloadData();
