@@ -406,6 +406,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     paymentAccounts: [],
     fixedExpenses: [],
     taskRequests: [],
+    clientTasks: [],
     financeSettings: { ownerSharePct: 70 },
     notifySettings: { email: '', phone: '', template: DEFAULT_ALERT_TEMPLATE },
     currentUser: null,
@@ -479,6 +480,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       notes: r.notes || '', status: r.status || 'Pendiente', createdAt: r.created_at
     };
   }
+  function clientVisibleTaskFromRow(r){
+    return {
+      id: r.id, clientId: r.client_id, project: r.project,
+      videoCount: Number(r.video_count)||0, videosDone: Number(r.videos_done)||0,
+      workflowStatus: r.workflow_status || 'Sin editar', deadline: r.deadline || '',
+      editedLink: r.edited_link || '', createdAt: r.created_at
+    };
+  }
   function clientFinanceFromRow(r){
     return {
       totalCharge: Number(r.total_charge)||0, totalIncome: Number(r.total_income)||0, gatewayFee: Number(r.gateway_fee)||0,
@@ -526,12 +535,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   async function reloadData(){
     if(state.currentUser && state.currentUser.type === 'client'){
-      const [ownClientRes, requestsRes] = await Promise.all([
+      const [ownClientRes, requestsRes, tasksRes] = await Promise.all([
         supabase.from('clients').select('*').eq('id', state.currentUser.id).maybeSingle(),
-        supabase.from('task_requests').select('*').eq('client_id', state.currentUser.id).order('created_at', { ascending: false })
+        supabase.from('task_requests').select('*').eq('client_id', state.currentUser.id).order('created_at', { ascending: false }),
+        supabase.from('client_visible_tasks').select('*').order('created_at', { ascending: false })
       ]);
       state.clients = ownClientRes.data ? [clientFromRow(ownClientRes.data)] : [];
       state.taskRequests = (requestsRes.data || []).map(taskRequestFromRow);
+      state.clientTasks = (tasksRes.data || []).map(clientVisibleTaskFromRow);
       return;
     }
 
@@ -975,7 +986,22 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const client = state.clients.find(c=>c.id===state.currentUser.id);
     const clientName = client ? client.name : '';
     const requests = state.taskRequests || [];
-    const rows = requests.map(r => `
+    const jobs = state.clientTasks || [];
+
+    const jobRows = jobs.map(t => `
+      <div class="task-card" style="margin-bottom:12px;">
+        <div class="task-top">
+          <div><strong>${escapeHtml(t.project)}</strong></div>
+          <span class="status-tag">${escapeHtml(t.workflowStatus)}</span>
+        </div>
+        <div class="task-meta">
+          <span>${t.videosDone}/${t.videoCount} video${t.videoCount===1?'':'s'} completados</span>
+          ${ t.deadline ? `<span>Entrega: ${fmtDate(t.deadline)}</span>` : '' }
+        </div>
+        ${ t.workflowStatus === 'Listo' && t.editedLink ? `<p style="margin:8px 0 0;"><a class="open-link" href="${escapeHtml(t.editedLink)}" target="_blank" rel="noopener">Ver video listo</a></p>` : '' }
+      </div>`).join('');
+
+    const requestRows = requests.map(r => `
       <div class="task-card" style="margin-bottom:12px;">
         <div class="task-top">
           <div><strong>${escapeHtml(r.project)}</strong></div>
@@ -994,8 +1020,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="login-wordmark">SCA</div>
         <span class="section-tag">Portal de cliente</span>
         <h1 class="login-title">Hola, ${escapeHtml(clientName)}</h1>
-        <p class="login-sub">Cargá acá los videos que necesitás. Lo revisamos y te los agendamos.</p>
+        <p class="login-sub">Acá ves cómo vienen tus videos, y podés pedir nuevos cuando quieras.</p>
 
+        <h2 class="section-title" style="font-size:16px; margin:0 0 14px;">Tus trabajos</h2>
+        ${ jobs.length ? jobRows : `<p class="empty-note" style="margin-bottom:24px;">Todavía no tenés trabajos asignados.</p>` }
+
+        <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Pedir videos nuevos</h2>
         <div class="field"><label class="field-label">¿Qué necesitás? (proyecto/nombre del pedido)</label><input type="text" id="input-request-project" placeholder="Ej: Videos de la campaña de agosto"></div>
         <div class="field-row">
           <div class="field"><label class="field-label">Cantidad de videos</label><input type="number" min="1" step="1" id="input-request-video-count" placeholder="1"></div>
@@ -1007,7 +1037,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
         ${ requests.length ? `
         <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Tus pedidos</h2>
-        ${rows}` : '' }
+        ${requestRows}` : '' }
 
         <p class="empty-note" style="margin-top:24px;"><a href="#" id="btn-logout-client">Salir</a></p>
       </div>
