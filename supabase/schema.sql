@@ -306,11 +306,17 @@ drop policy if exists "client read own row" on public.clients;
 create policy "client read own row" on public.clients
   for select using (id = public.current_client_id());
 
--- client_contracts: solo admin, ni lectura para editores. Esto es lo que
--- realmente oculta el contrato — no una decisión de la pantalla.
+-- client_contracts: solo admin puede crear/editar/borrar, y ni lectura para
+-- editores — esto es lo que realmente oculta el contrato de un editor, no
+-- una decisión de la pantalla. Un cliente sí puede leer su propio contrato
+-- (es el contrato QUE ÉL FIRMÓ), nunca el de otro cliente.
 drop policy if exists "admin only client_contracts" on public.client_contracts;
 create policy "admin only client_contracts" on public.client_contracts
   for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
+
+drop policy if exists "client read own contract" on public.client_contracts;
+create policy "client read own contract" on public.client_contracts
+  for select using (client_id = public.current_client_id());
 
 -- tasks: admin puede todo; un editor solo puede ver/crear/editar/borrar
 -- las tareas asignadas a sí mismo.
@@ -350,13 +356,13 @@ create policy "client read own task_requests" on public.task_requests
 
 -- Un cliente ve el estado de sus tareas (para eso está el portal), pero
 -- "tasks" tiene columnas que no debe ver bajo ningún concepto (precio al
--- editor, links de material crudo, notas internas). Por eso no se le da
--- ninguna policy de acceso directo a "tasks" — solo a esta vista, que ya
--- trae adentro el filtro "es tuya" y solo expone columnas seguras.
+-- editor, guión, notas internas). Por eso no se le da ninguna policy de
+-- acceso directo a "tasks" — solo a esta vista, que ya trae adentro el
+-- filtro "es tuya" y solo expone columnas seguras.
 create or replace view public.client_visible_tasks as
 select
   id, client_id, project, video_count, videos_done,
-  workflow_status, deadline, edited_link, created_at
+  workflow_status, deadline, raw_link, edited_link, created_at
 from public.tasks
 where client_id = public.current_client_id();
 
