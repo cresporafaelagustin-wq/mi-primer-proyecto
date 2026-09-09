@@ -416,6 +416,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     clientDetailId: null,
     editorDetailId: null,
     viewAsEditorId: null,
+    viewAsClientId: null,
     previewReturnTab: null,
     modal: null,
     inverted: localStorage.getItem('sca_inverted') === '1'
@@ -679,6 +680,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       state.currentUser = null;
       state.profile = null;
       state.viewAsEditorId = null;
+      state.viewAsClientId = null;
       state.previewReturnTab = null;
       state.ready = true;
       render();
@@ -888,6 +890,11 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(!state.currentUser){ app.innerHTML = renderLogin(); attachLoginEvents(); return; }
     if(state.currentUser.type === 'unlinked'){ app.innerHTML = renderUnlinked(); attachUnlinkedEvents(); return; }
     if(state.currentUser.type === 'client'){ app.innerHTML = renderClientPortal(); attachClientPortalEvents(); return; }
+    if(state.currentUser.type === 'admin' && state.viewAsClientId){
+      const previewClient = state.clients.find(c=>c.id===state.viewAsClientId);
+      if(!previewClient){ state.viewAsClientId = null; }
+      else { app.innerHTML = renderClientPreview(previewClient); attachClientPortalEvents(); return; }
+    }
     let html = renderShell();
     if(state.modal){ html += renderModal(); }
     app.innerHTML = html;
@@ -986,9 +993,19 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
   function renderClientPortal(){
     const client = state.clients.find(c=>c.id===state.currentUser.id);
+    return renderClientPortalContent(client, state.clientTasks || [], state.taskRequests || [], false);
+  }
+
+  function renderClientPreview(client){
+    const jobs = state.tasks
+      .filter(t=>t.clientId===client.id)
+      .map(t=>({ project: t.project, workflowStatus: t.workflowStatus, videosDone: t.videosDone, videoCount: t.videoCount, deadline: t.deadline, rawLink: t.rawLink, editedLink: t.editedLink }));
+    const requests = (state.taskRequests||[]).filter(r=>r.clientId===client.id);
+    return renderClientPortalContent(client, jobs, requests, true);
+  }
+
+  function renderClientPortalContent(client, jobs, requests, readOnly){
     const clientName = client ? client.name : '';
-    const requests = state.taskRequests || [];
-    const jobs = state.clientTasks || [];
 
     const clientLinkRow = (label, url) => `
       <div class="link-row">
@@ -1025,9 +1042,25 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         ${ r.notes ? `<p class="empty-note" style="margin:8px 0 0;">${escapeHtml(r.notes)}</p>` : '' }
       </div>`).join('');
 
+    const requestFormHtml = readOnly ? '' : `
+        <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Pedir videos nuevos</h2>
+        <div class="field"><label class="field-label">¿Qué necesitás? (proyecto/nombre del pedido)</label><input type="text" id="input-request-project" placeholder="Ej: Videos de la campaña de agosto"></div>
+        <div class="field-row">
+          <div class="field"><label class="field-label">Cantidad de videos</label><input type="number" min="1" step="1" id="input-request-video-count" placeholder="1"></div>
+          <div class="field"><label class="field-label">Fecha límite deseada (opcional)</label><input type="date" id="input-request-deadline"></div>
+        </div>
+        <div class="field"><label class="field-label">Notas / detalles</label><textarea id="input-request-notes" rows="3" placeholder="Contexto, referencias, lo que haga falta..."></textarea></div>
+        <p class="login-error" id="request-error" style="display:none;"></p>
+        <div class="role-list"><button class="role-btn admin-btn" id="btn-send-request">Enviar pedido</button></div>`;
+
+    const bottomHtml = readOnly
+      ? `<div class="role-list" style="margin-top:24px;"><button class="btn btn-ghost btn-sm" id="btn-exit-client-preview">Salir de la vista previa</button></div>`
+      : `<p class="empty-note" style="margin-top:24px;"><a href="#" id="btn-logout-client">Salir</a></p>`;
+
     return `
     <div class="login-screen">
       <div class="login-card" style="max-width:560px;">
+        ${ readOnly ? `<div style="border:2px solid var(--ink); padding:12px 16px; margin-bottom:22px; font-size:12.5px; line-height:1.5;">👁 Estás viendo el portal como lo ve <strong>${escapeHtml(clientName)}</strong>. Es de solo lectura — no se puede enviar un pedido desde acá.</div>` : '' }
         <div class="login-wordmark">SCA</div>
         <span class="section-tag">Portal de cliente</span>
         <h1 class="login-title">Hola, ${escapeHtml(clientName)}</h1>
@@ -1048,21 +1081,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           </div>
         </div>
 
-        <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Pedir videos nuevos</h2>
-        <div class="field"><label class="field-label">¿Qué necesitás? (proyecto/nombre del pedido)</label><input type="text" id="input-request-project" placeholder="Ej: Videos de la campaña de agosto"></div>
-        <div class="field-row">
-          <div class="field"><label class="field-label">Cantidad de videos</label><input type="number" min="1" step="1" id="input-request-video-count" placeholder="1"></div>
-          <div class="field"><label class="field-label">Fecha límite deseada (opcional)</label><input type="date" id="input-request-deadline"></div>
-        </div>
-        <div class="field"><label class="field-label">Notas / detalles</label><textarea id="input-request-notes" rows="3" placeholder="Contexto, referencias, lo que haga falta..."></textarea></div>
-        <p class="login-error" id="request-error" style="display:none;"></p>
-        <div class="role-list"><button class="role-btn admin-btn" id="btn-send-request">Enviar pedido</button></div>
+        ${requestFormHtml}
 
         ${ requests.length ? `
         <h2 class="section-title" style="font-size:16px; margin:30px 0 14px;">Tus pedidos</h2>
         ${requestRows}` : '' }
 
-        <p class="empty-note" style="margin-top:24px;"><a href="#" id="btn-logout-client">Salir</a></p>
+        ${bottomHtml}
       </div>
     </div>`;
   }
@@ -1070,6 +1095,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function attachClientPortalEvents(){
     const logoutBtn = document.getElementById('btn-logout-client');
     if(logoutBtn) logoutBtn.onclick = (e) => { e.preventDefault(); withBusy(doLogout); };
+    const exitPreviewBtn = document.getElementById('btn-exit-client-preview');
+    if(exitPreviewBtn) exitPreviewBtn.onclick = () => { state.viewAsClientId = null; render(); };
     const sendBtn = document.getElementById('btn-send-request');
     if(sendBtn) sendBtn.onclick = () => withBusy(async () => {
       const errorEl = document.getElementById('request-error');
@@ -1919,6 +1946,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
           <button class="client-status-btn" data-assign-status="${c.id}">${c.status ? escapeHtml(c.status) : 'Asignar estado'}</button>
+          <button class="btn btn-ghost btn-sm" data-view-as-client="${c.id}">Ver como</button>
           <button class="btn btn-ghost btn-sm" data-edit-client="${c.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-client="${c.id}">Eliminar</button>
         </div>
@@ -1978,6 +2006,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div><span class="section-tag">Ficha de cliente</span><h2 class="section-title">${escapeHtml(client.name)}</h2></div>
         ${ isAdmin ? `
         <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-view-as-client="${client.id}">Ver como</button>
           <button class="btn btn-ghost btn-sm" data-edit-client="${client.id}">Editar</button>
           <button class="btn btn-danger btn-sm" data-delete-client="${client.id}">Eliminar</button>
         </div>` : '' }
@@ -2559,6 +2588,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         state.activeTab = 'resumen';
         state.clientDetailId = null;
         state.editorDetailId = null;
+        render();
+      };
+    });
+    document.querySelectorAll('[data-view-as-client]').forEach(btn=>{
+      btn.onclick = () => {
+        state.viewAsClientId = btn.getAttribute('data-view-as-client');
         render();
       };
     });
