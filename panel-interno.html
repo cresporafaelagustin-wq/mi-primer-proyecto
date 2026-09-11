@@ -478,7 +478,9 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       id: r.id, clientId: r.client_id, project: r.project,
       videoCount: Number(r.video_count)||0, videosDone: Number(r.videos_done)||0,
       workflowStatus: r.workflow_status || 'Sin editar', deadline: r.deadline || '',
-      rawLink: r.raw_link || '', editedLink: r.edited_link || '', createdAt: r.created_at
+      rawLink: r.raw_link || '', scriptLink: r.script_link || '',
+      editedLink: r.edited_link || '', editReferenceLink: r.edit_reference_link || '',
+      createdAt: r.created_at
     };
   }
   function clientFinanceFromRow(r){
@@ -1196,7 +1198,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(readOnly){
       return state.tasks.filter(t=>t.clientId===client.id).map(t=>({
         id: t.id, project: t.project, workflowStatus: t.workflowStatus, videosDone: t.videosDone,
-        videoCount: t.videoCount, deadline: t.deadline, rawLink: t.rawLink, editedLink: t.editedLink
+        videoCount: t.videoCount, deadline: t.deadline, rawLink: t.rawLink, scriptLink: t.scriptLink,
+        editedLink: t.editedLink, editReferenceLink: t.editReferenceLink
       }));
     }
     return state.clientTasks || [];
@@ -1293,10 +1296,12 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
             <span>${t.videosDone}/${t.videoCount} video${t.videoCount===1?'':'s'} completados</span>
             ${ t.deadline ? `<span>Entrega: ${fmtDate(t.deadline)}</span>` : '' }
           </div>
-          ${ t.rawLink || t.editedLink ? `<div class="task-links">
-            ${ t.rawLink ? contentLinkRow('Crudo', t.rawLink) : '' }
-            ${ t.editedLink ? contentLinkRow('Editado', t.editedLink) : '' }
-          </div>` : '' }
+          <div class="task-links">
+            ${contentLinkRow('Crudo', t.rawLink)}
+            ${contentLinkRow('Guión', t.scriptLink)}
+            ${contentLinkRow('Editado', t.editedLink)}
+            ${contentLinkRow('Referente', t.editReferenceLink)}
+          </div>
         </div>
       </div>
     </div>`;

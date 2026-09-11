@@ -342,13 +342,13 @@ create policy "client insert own task" on public.tasks
 
 -- Un cliente ve el estado de sus tareas (para eso está el portal), pero
 -- "tasks" tiene columnas que no debe ver bajo ningún concepto (precio al
--- editor, guión, notas internas). Por eso no se le da ninguna policy de
--- acceso directo a "tasks" — solo a esta vista, que ya trae adentro el
--- filtro "es tuya" y solo expone columnas seguras.
+-- editor, notas internas). Por eso no se le da ninguna policy de acceso
+-- directo a "tasks" — solo a esta vista, que ya trae adentro el filtro
+-- "es tuya" y solo expone columnas seguras.
 create or replace view public.client_visible_tasks as
 select
-  id, client_id, project, video_count, videos_done,
-  workflow_status, deadline, raw_link, edited_link, created_at
+  id, client_id, project, video_count, videos_done, workflow_status, deadline,
+  raw_link, script_link, edited_link, edit_reference_link, created_at
 from public.tasks
 where client_id = public.current_client_id();
 
