@@ -16,7 +16,10 @@
 -- la vista — así ni con las herramientas de desarrollador del navegador un
 -- cliente puede pedir la tabla completa.
 
-create or replace view public.client_visible_tasks as
+-- drop + create (no "or replace"): Postgres no deja reordenar ni insertar
+-- columnas en el medio de una vista existente con "create or replace".
+drop view if exists public.client_visible_tasks;
+create view public.client_visible_tasks as
 select
   id, client_id, project, video_count, videos_done, workflow_status, deadline,
   raw_link, script_link, edited_link, edit_reference_link, created_at
