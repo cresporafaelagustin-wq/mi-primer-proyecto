@@ -309,6 +309,23 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .link-row input{ font-size:12.5px; padding:8px 10px; }
 .link-row a.open-link{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink); text-decoration:underline; white-space:nowrap; }
 
+/* ============ FICHA DE TRABAJO DEL CLIENTE ============ */
+.client-job-deadline{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.03em; color:var(--ink-soft); margin:0; }
+.client-job-progress{ margin:26px 0; }
+.client-job-progress .unit{ width:20px; height:20px; }
+.client-job-materials{ border-top:1px solid var(--paper-line); padding-top:20px; margin-top:26px; }
+.client-job-materials h4{
+  font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--ink-soft); font-weight:600; margin:0 0 12px;
+}
+.client-material-row{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding:13px 16px; border:1px solid var(--paper-line); margin-bottom:8px;
+}
+.client-material-row:last-child{ margin-bottom:0; }
+.client-material-label{ font-size:13.5px; font-weight:600; }
+.client-material-row a.open-link{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink); text-decoration:underline; white-space:nowrap; }
+
 .task-footer{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; border-top:1px solid var(--paper-line); padding-top:13px; margin-top:2px; gap:10px; }
 .rate-tag{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink); }
 .task-actions{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -1281,27 +1298,39 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cerrar</button></div>
       </div></div>`;
     }
+    const count = Math.max(Number(t.videoCount||0), 1);
+    const units = Array.from({length: count}).map((_,i)=> `<div class="unit ${i < Number(t.videosDone||0) ? 'done':''}"></div>`).join('');
+    const materials = [
+      ['Material crudo', t.rawLink],
+      ['Guión', t.scriptLink],
+      ['Video editado', t.editedLink],
+      ['Referencia de edición', t.editReferenceLink]
+    ].filter(([,url])=>url);
+    const materialsHtml = materials.length ? materials.map(([label,url]) => `
+      <div class="client-material-row">
+        <span class="client-material-label">${escapeHtml(label)}</span>
+        <a class="open-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir →</a>
+      </div>`).join('') : `<p class="empty-note" style="margin:0;">Todavía no hay material cargado para este trabajo.</p>`;
+
     return `
     <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal" style="max-width:480px;">
-        <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+      <div class="modal client-job-modal" style="max-width:480px;">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
           <button class="btn btn-ghost btn-sm" id="btn-cancel-modal">Cerrar</button>
         </div>
-        <div class="task-card" style="border:none; padding:0;">
-          <div class="task-top">
-            <div><div class="task-project">${escapeHtml(t.project)}</div></div>
-            <span class="status-tag">${escapeHtml(t.workflowStatus)}</span>
-          </div>
-          <div class="task-meta">
-            <span>${t.videosDone}/${t.videoCount} video${t.videoCount===1?'':'s'} completados</span>
-            ${ t.deadline ? `<span>Entrega: ${fmtDate(t.deadline)}</span>` : '' }
-          </div>
-          <div class="task-links">
-            ${contentLinkRow('Crudo', t.rawLink)}
-            ${contentLinkRow('Guión', t.scriptLink)}
-            ${contentLinkRow('Editado', t.editedLink)}
-            ${contentLinkRow('Referente', t.editReferenceLink)}
-          </div>
+
+        <span class="status-tag${t.workflowStatus==='Listo'?' status-completado':''}">${escapeHtml(t.workflowStatus)}</span>
+        <h3 class="section-title" style="margin:12px 0 4px;">${escapeHtml(t.project)}</h3>
+        ${ t.deadline ? `<p class="client-job-deadline">Entrega ${fmtDate(t.deadline)}</p>` : '' }
+
+        <div class="client-job-progress">
+          <div class="unit-grid">${units}</div>
+          <div class="unit-label">${t.videosDone}/${t.videoCount} video${t.videoCount===1?'':'s'} completado${t.videosDone===1?'':'s'}</div>
+        </div>
+
+        <div class="client-job-materials">
+          <h4>Material</h4>
+          ${materialsHtml}
         </div>
       </div>
     </div>`;
