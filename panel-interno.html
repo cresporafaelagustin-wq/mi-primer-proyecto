@@ -310,6 +310,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .link-row a.open-link{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink); text-decoration:underline; white-space:nowrap; }
 
 /* ============ FICHA DE TRABAJO DEL CLIENTE ============ */
+.client-job-modal{ position:relative; }
+.client-job-close{
+  position:absolute; top:18px; right:18px; width:30px; height:30px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--paper-line); background:var(--paper); color:var(--ink);
+  font-size:18px; line-height:1; cursor:pointer; transition:border-color .12s;
+}
+.client-job-close:hover{ border-color:var(--ink); }
 .client-job-deadline{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.03em; color:var(--ink-soft); margin:0; }
 .client-job-progress{ margin:26px 0; }
 .client-job-progress .unit{ width:20px; height:20px; }
@@ -1315,9 +1323,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal client-job-modal" style="max-width:480px;">
-        <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
-          <button class="btn btn-ghost btn-sm" id="btn-cancel-modal">Cerrar</button>
-        </div>
+        <button class="client-job-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
 
         <span class="status-tag${t.workflowStatus==='Listo'?' status-completado':''}">${escapeHtml(t.workflowStatus)}</span>
         <h3 class="section-title" style="margin:12px 0 4px;">${escapeHtml(t.project)}</h3>
