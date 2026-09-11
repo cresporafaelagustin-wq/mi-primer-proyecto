@@ -156,7 +156,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .user-dot{ width:6px; height:6px; background:var(--cream); flex-shrink:0; }
 .user-dot.admin{ background:var(--cream); }
 
-.main{ flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; }
+.main{ position:relative; z-index:0; flex:1; padding:46px 50px 96px; max-width:1180px; width:100%; margin:0 auto; }
+.brand-watermark{
+  position:absolute; z-index:-1; inset:0; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Playfair Display', serif; font-weight:700; font-size:min(32vw, 420px); line-height:1;
+  color:var(--ink); opacity:0.05; filter:blur(7px); pointer-events:none; user-select:none; white-space:nowrap;
+}
 .section-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
 
 @media (max-width:860px){
@@ -1052,7 +1058,10 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
           <button class="btn btn-ghost btn-sm sidebar-btn" id="btn-logout" style="border-color:var(--cream);color:var(--cream);"><span class="sidebar-btn-mark">×</span><span class="sidebar-hide-label">Salir</span></button>
         </div>
       </aside>
-      <div class="main" id="main-content">${ renderMainContent(isAdmin) }</div>
+      <div class="main" id="main-content">
+        ${ (isClient || previewingClient) ? '<div class="brand-watermark" aria-hidden="true">SCA</div>' : '' }
+        ${ renderMainContent(isAdmin) }
+      </div>
     </div>`;
   }
 
