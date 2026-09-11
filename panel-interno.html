@@ -310,14 +310,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 .link-row a.open-link{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink); text-decoration:underline; white-space:nowrap; }
 
 /* ============ FICHA DE TRABAJO DEL CLIENTE ============ */
-.client-job-modal{ position:relative; }
-.client-job-close{
+.modal-close{
   position:absolute; top:18px; right:18px; width:30px; height:30px;
   display:flex; align-items:center; justify-content:center;
   border:1px solid var(--paper-line); background:var(--paper); color:var(--ink);
   font-size:18px; line-height:1; cursor:pointer; transition:border-color .12s;
+  z-index:1;
 }
-.client-job-close:hover{ border-color:var(--ink); }
+.modal-close:hover{ border-color:var(--ink); }
 .client-job-deadline{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.03em; color:var(--ink-soft); margin:0; }
 .client-job-progress{ margin:26px 0; }
 .client-job-progress .unit{ width:20px; height:20px; }
@@ -344,7 +344,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
 /* ============ MODAL ============ */
 .modal-backdrop{ position:fixed; inset:0; background:rgba(17,17,16,0.55); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; overflow-y:auto; }
-.modal{ background:var(--paper); border:1px solid var(--ink); padding:30px 30px 24px; width:100%; max-width:490px; max-height:88vh; overflow-y:auto; }
+.modal{ position:relative; background:var(--paper); border:1px solid var(--ink); padding:30px 30px 24px; width:100%; max-width:490px; max-height:88vh; overflow-y:auto; }
 .modal h3{ font-family:'Playfair Display', serif; font-weight:600; font-size:21px; margin:0 0 20px; }
 .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:22px; border-top:1px solid var(--paper-line); padding-top:18px; }
 
@@ -1302,8 +1302,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(!t){
       return `
       <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+        <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
         <h3>Trabajo no encontrado</h3>
-        <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cerrar</button></div>
       </div></div>`;
     }
     const count = Math.max(Number(t.videoCount||0), 1);
@@ -1322,8 +1322,8 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
 
     return `
     <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal client-job-modal" style="max-width:480px;">
-        <button class="client-job-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
+      <div class="modal" style="max-width:480px;">
+        <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
 
         <span class="status-tag${t.workflowStatus==='Listo'?' status-completado':''}">${escapeHtml(t.workflowStatus)}</span>
         <h3 class="section-title" style="margin:12px 0 4px;">${escapeHtml(t.project)}</h3>
@@ -1807,17 +1807,15 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     if(!t){
       return `
       <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+        <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
         <h3>Tarea no encontrada</h3>
         <p class="goal-message">Puede que se haya eliminado.</p>
-        <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cerrar</button></div>
       </div></div>`;
     }
     return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal" style="max-width:640px;">
-        <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
-          <button class="btn btn-ghost btn-sm" id="btn-cancel-modal">Cerrar</button>
-        </div>
+        <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
         <div class="task-detail-inner">${renderTaskCard(t, isAdmin)}</div>
       </div>
     </div>`;
@@ -2944,31 +2942,34 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderAccountModal(data){
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:400px;">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>${data ? 'Editar cuenta' : 'Nueva cuenta'}</h3>
       <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-account-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: BBVA"></div>
       <div class="field"><label class="field-label">Saldo actual ($)</label><input type="number" step="0.01" id="input-account-balance" value="${data && data.balance ? data.balance : ''}" placeholder="0"></div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-account">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-account">Guardar</button></div>
     </div></div>`;
   }
 
   function renderExpenseModal(data){
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>${data ? 'Editar gasto fijo' : 'Nuevo gasto fijo'}</h3>
       <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-expense-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Adobe Suite"></div>
       <div class="field"><label class="field-label">Costo mensual ($)</label><input type="number" step="0.01" id="input-expense-cost" value="${data && data.cost ? data.cost : ''}" placeholder="0"></div>
       <div class="field"><label class="field-label">Cuenta de salida</label><select id="input-expense-account">${accountOptionsHtml(data?data.payoutAccountId:'')}</select></div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-expense">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-expense">Guardar</button></div>
     </div></div>`;
   }
 
   function renderReferrerModal(data){
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:420px;">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>${data ? 'Editar referente' : 'Nuevo referente'}</h3>
       <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-referrer-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Francisco Rizzardo"></div>
       <div class="field"><label class="field-label">Cuenta de salida</label><select id="input-referrer-account">${accountOptionsHtml(data?data.payoutAccountId:'')}</select></div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-referrer">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-referrer">Guardar</button></div>
     </div></div>`;
   }
 
@@ -2981,6 +2982,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const planHintText = clientPaidVideosPlanHint(client);
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>Finanzas de ${escapeHtml(client.name)}</h3>
       <div class="field-row">
         <div class="field"><label class="field-label">Total a cobrar ($)</label><input type="number" step="0.01" id="input-finance-total-charge" value="${client.totalCharge || ''}" placeholder="0"></div>
@@ -3013,7 +3015,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         </label>
       </div>
       <p class="field-hint">El costo de edición se calcula solo, a partir de las tareas de este cliente — no hace falta cargarlo acá.</p>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client-finance">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-client-finance">Guardar</button></div>
     </div></div>`;
   }
 
@@ -3021,13 +3023,13 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const options = CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${client&&client.status===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:400px;">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>Estado de ${escapeHtml(client ? client.name : 'cliente')}</h3>
       <div class="field">
         <label class="field-label">Estado</label>
         <select id="input-assign-status"><option value="">Sin estado</option>${options}</select>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
         <button class="btn btn-primary" id="btn-assign-status-submit">Guardar</button>
       </div>
     </div></div>`;
@@ -3048,6 +3050,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderImportBackupModal(){
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:520px;">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>Importar backup (.json)</h3>
       <p style="margin:0 0 16px;color:var(--ink-soft);font-size:13.5px;line-height:1.55;">
         Subí el archivo que descargaste con "Exportar datos" del panel viejo (o de una exportación anterior de este mismo panel). Los editores y clientes se emparejan por nombre — si ya existen no se duplican, solo se completan datos que falten. Las tareas siempre se crean como nuevas.
@@ -3055,7 +3058,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="field"><label class="field-label">Archivo</label><input type="file" accept="application/json" id="input-backup-file"></div>
       <p class="field-hint">Los editores importados no van a tener email todavía (el export viejo no lo incluía) — para que puedan loguearse, editalos después y agregales el email.</p>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
         <button class="btn btn-primary" id="btn-import-backup-submit">Importar</button>
       </div>
     </div></div>`;
@@ -3101,6 +3103,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const seedText = SHEET_CLIENT_SEED.map(pair => pair.join('\t')).join('\n');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal" style="max-width:560px;">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>Importar clientes desde Sheets</h3>
       <p style="margin:0 0 16px;color:var(--ink-soft);font-size:13.5px;line-height:1.55;">
         Pegá acá tus clientes, uno por línea. Si copiás dos columnas de tu planilla (Nombre y Estado) y las pegás juntas, se completa el estado automáticamente — separalas con un tab, que es lo que queda al copiar directo de Sheets.
@@ -3111,7 +3114,6 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <textarea id="input-import-clients" rows="10" style="font-family:'Inter',sans-serif; resize:vertical;">${escapeHtml(seedText)}</textarea>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button>
         <button class="btn btn-primary" id="btn-import-clients-submit">Importar</button>
       </div>
     </div></div>`;
@@ -3120,6 +3122,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
   function renderEditorModal(data){
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>${data ? 'Editar editor' : 'Nuevo editor'}</h3>
       <div class="field"><label class="field-label">Nombre</label><input type="text" id="input-editor-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Martina Gómez"></div>
       <div class="field">
@@ -3128,13 +3131,14 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <p class="field-hint">Con este email va a poder iniciar sesión: le llega un código de 6 dígitos por correo, sin contraseña. Podés dejarlo vacío y cargarlo después.</p>
       </div>
       <div class="field"><label class="field-label">Cuenta desde la que se le paga</label><select id="input-editor-account">${accountOptionsHtml(data?data.payoutAccountId:'')}</select></div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-editor">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-editor">Guardar</button></div>
     </div></div>`;
   }
   function renderClientModal(data){
     const statusOptions = CLIENT_STATUSES.map(s=>`<option value="${escapeHtml(s)}" ${data&&data.status===s?'selected':''}>${escapeHtml(s)}</option>`).join('');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>${data ? 'Editar cliente' : 'Nuevo cliente'}</h3>
       <div class="field"><label class="field-label">Nombre del cliente</label><input type="text" id="input-client-name" value="${escapeHtml(data?data.name:'')}" placeholder="Ej: Café Luna"></div>
       <div class="field"><label class="field-label">Estado</label><select id="input-client-status"><option value="">Sin estado</option>${statusOptions}</select></div>
@@ -3157,7 +3161,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <p class="field-hint">Este link no lo ven los editores — solo vos, como administrador.</p>
       </div>
 
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-client">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-client">Guardar</button></div>
     </div></div>`;
   }
   function renderBulkTaskModal(){
@@ -3165,6 +3169,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const editorOptions = state.editors.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>Varias tareas de una</h3>
       <p class="field-hint" style="margin:0 0 15px;">Escribí un nombre de proyecto por línea. Se va a crear una tarea por cada línea, todas con estos mismos datos.</p>
       <div class="field"><label class="field-label">Nombres de los proyectos (uno por línea)</label><textarea id="input-bulk-projects" rows="6" placeholder="Crudos AD 1 Agosto&#10;Crudos AD 2 Agosto&#10;Crudos AD 3 Agosto"></textarea></div>
@@ -3191,7 +3196,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
         <input type="number" min="0" step="0.01" id="input-bulk-client-price" value="0">
         <p class="field-hint">Opcional. Esto no lo ven los editores.</p>
       </div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-bulk-tasks">Crear tareas</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-bulk-tasks">Crear tareas</button></div>
     </div></div>`;
   }
 
@@ -3213,6 +3218,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
     const initialClientName = initialClientId ? clientName(initialClientId) : '';
     return `
     <div class="modal-backdrop" id="modal-backdrop"><div class="modal">
+      <button class="modal-close" id="btn-cancel-modal" aria-label="Cerrar">×</button>
       <h3>${data ? 'Editar tarea' : (seed ? 'Duplicar tarea' : 'Nueva tarea')}</h3>
       <div class="field"><label class="field-label">Nombre del proyecto</label><input type="text" id="input-task-project" value="${escapeHtml(src?src.project:'')}" placeholder="Ej: Reels agosto"></div>
       <div class="field-row">
@@ -3265,7 +3271,7 @@ button.btn:disabled{ opacity:0.5; cursor:default; }
       <div class="field"><label class="field-label">Link material editado</label><input type="text" id="input-task-edited" value="${escapeHtml(src?src.editedLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Referente de edición (si tiene)</label><input type="text" id="input-task-edit-reference" value="${escapeHtml(src?src.editReferenceLink||'':'')}" placeholder="https://..."></div>
       <div class="field"><label class="field-label">Notas</label><textarea id="input-task-notes" rows="3" placeholder="Contexto, pedidos del cliente, aprobaciones pendientes...">${escapeHtml(src?src.notes||'':'')}</textarea></div>
-      <div class="modal-actions"><button class="btn btn-ghost" id="btn-cancel-modal">Cancelar</button><button class="btn btn-primary" id="btn-save-task">Guardar</button></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="btn-save-task">Guardar</button></div>
     </div></div>`;
   }
 
